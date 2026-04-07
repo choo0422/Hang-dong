@@ -500,6 +500,21 @@ textarea{resize:vertical;min-height:80px}
   </div>
 </div>
 
+<!-- ROLE MODAL -->
+<div class="mo" id="mo-role">
+  <div class="mbox">
+    <h3 id="mo-role-name" style="margin-bottom:16px"></h3>
+    <div id="mo-role-btns" style="display:flex;flex-direction:column;gap:8px"></div>
+    <div style="height:8px"></div>
+    <button class="btn btno btnsm" onclick="closeModal('mo-role')">취소</button>
+    <div style="height:8px"></div>
+    <div style="display:flex;gap:8px">
+      <button id="mo-role-reset-btn" class="btn btnsm" style="flex:1;background:var(--yel);color:#000;border:none" onclick="resetDeviceFromRole()">🔓 기기 초기화</button>
+      <button id="mo-role-del-btn" class="btn btnr btnsm" style="flex:1" onclick="deleteMemberFromRole()">🗑️ 팀원 삭제</button>
+    </div>
+  </div>
+</div>
+
 <!-- VOTE EDIT MODAL -->
 <div class="mo" id="mo-edit-vote">
   <div class="mbox" style="max-height:90vh;overflow-y:auto">
@@ -1648,31 +1663,44 @@ function renderAdmin() {
   var duesAmtIn = el('a-dues-amount'); if(duesAmtIn) duesAmtIn.value = S.duesAmount || 30000;
   var admMonthLbl = el('a-dues-month-label'); if(admMonthLbl) admMonthLbl.textContent = ymLabel(duesAdminMonth);
   renderAdminDues();
-  // 팀원
+  // 팀원 - 칩 형태로 가로 나열
   var ROLES = ['회원','회장','부회장','감독','코치','고문','운영총무','재정총무'];
-  var ROLE_COLOR = {'회장':'var(--yel)','부회장':'var(--yel)','감독':'var(--blu)','코치':'var(--blu)','고문':'var(--mut)','운영총무':'var(--g)','재정총무':'var(--g)','회원':'var(--mut)'};
-  setHTML('a-members', (S.members||[]).length ? (S.members||[]).map(function(n){
-    var dn = S.deviceNames || {};
-    var regDid = null;
-    Object.keys(dn).forEach(function(k){ if(dn[k]===n) regDid=k; });
-    var curRole = (S.memberRoles||{})[n] || '회원';
-    var roleOpts = ROLES.map(function(r){
-      return '<option value="'+r+'"'+(r===curRole?' selected':'')+'>'+r+'</option>';
-    }).join('');
-    return '<div class="sr" style="flex-wrap:wrap;gap:6px;padding:10px 0">' +
-      '<div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0">' +
-        '<span style="font-size:14px;font-weight:500;flex:1">'+n+'</span>' +
-        (regDid ? '<span style="font-size:10px;color:var(--g);background:rgba(255,109,0,.1);padding:1px 6px;border-radius:10px">등록됨</span>' : '') +
-      '</div>' +
-      '<div style="display:flex;align-items:center;gap:6px;width:100%;margin-top:4px">' +
-        '<select onchange="setMemberRole(\''+n+'\',this.value)" style="flex:1;margin-bottom:0;font-size:12px;padding:5px 8px;color:'+ROLE_COLOR[curRole]+';border-color:var(--brd)">' +
-          roleOpts +
-        '</select>' +
-        (regDid ? '<button data-did="'+regDid+'" onclick="deleteDeviceName(this)" style="background:var(--yel);color:#000;border:none;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer">초기화</button>' : '') +
-        '<button onclick="removeMember(\''+n+'\')" style="background:var(--red);color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer">삭제</button>' +
-      '</div>' +
+  var ROLE_STYLE = {
+    '회원':   'color:#EFEFEF;border-color:#444;background:transparent',
+    '회장':   'color:#FFD600;border-color:#FFD600;background:rgba(255,214,0,.12)',
+    '부회장': 'color:#FFD600;border-color:#FFD600;background:rgba(255,214,0,.08)',
+    '감독':   'color:#2979FF;border-color:#2979FF;background:rgba(41,121,255,.12)',
+    '코치':   'color:#2979FF;border-color:#2979FF;background:rgba(41,121,255,.08)',
+    '고문':   'color:#aaa;border-color:#666;background:rgba(255,255,255,.05)',
+    '운영총무':'color:#FF6D00;border-color:#FF6D00;background:rgba(255,109,0,.12)',
+    '재정총무':'color:#FF6D00;border-color:#FF6D00;background:rgba(255,109,0,.08)'
+  };
+  // 직책 범례
+  var legend =
+    '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;padding:10px;background:var(--c1);border-radius:10px">' +
+    '<div style="font-size:11px;color:var(--mut);width:100%;margin-bottom:4px">직책 색상 안내</div>' +
+    Object.keys(ROLE_STYLE).map(function(r){
+      return '<span style="font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid;'+ROLE_STYLE[r]+'">'+r+'</span>';
+    }).join('') +
     '</div>';
-  }).join('') : '<div style="color:var(--mut);font-size:13px;text-align:center;padding:8px 0">등록된 팀원 없음</div>');
+
+  var chips = (S.members||[]).length ?
+    '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
+    (S.members||[]).map(function(n){
+      var role = (S.memberRoles||{})[n] || '회원';
+      var style = ROLE_STYLE[role] || ROLE_STYLE['회원'];
+      var dn = S.deviceNames || {};
+      var regDid = null;
+      Object.keys(dn).forEach(function(k){ if(dn[k]===n) regDid=k; });
+      return '<div onclick="openRoleModal(\''+n+'\')" style="padding:5px 12px;border-radius:20px;font-size:13px;cursor:pointer;border:1px solid;transition:.15s;position:relative;'+style+'">' +
+        n +
+        (regDid ? '<span style="position:absolute;top:-3px;right:-3px;width:7px;height:7px;border-radius:50%;background:var(--g);border:1px solid var(--c2)"></span>' : '') +
+      '</div>';
+    }).join('') +
+    '</div>' :
+    '<div style="color:var(--mut);font-size:13px;text-align:center;padding:8px 0">등록된 팀원 없음</div>';
+
+  setHTML('a-members', legend + chips);
   // 이름 등록 현황
   var dn = S.deviceNames || {};
   var devKeys = Object.keys(dn);
@@ -1754,6 +1782,76 @@ function addMember() {
     saveState(); renderAdmin(); renderDues();
   }
   el('a-new-member').value = '';
+}
+
+// ── 직책 변경 모달 ──
+var _roleTargetName = '';
+
+function openRoleModal(name) {
+  _roleTargetName = name;
+  var ROLES = ['회원','회장','부회장','감독','코치','고문','운영총무','재정총무'];
+  var ROLE_STYLE = {
+    '회원':   'color:#EFEFEF;border-color:#444;background:transparent',
+    '회장':   'color:#FFD600;border-color:#FFD600;background:rgba(255,214,0,.12)',
+    '부회장': 'color:#FFD600;border-color:#FFD600;background:rgba(255,214,0,.08)',
+    '감독':   'color:#2979FF;border-color:#2979FF;background:rgba(41,121,255,.12)',
+    '코치':   'color:#2979FF;border-color:#2979FF;background:rgba(41,121,255,.08)',
+    '고문':   'color:#aaa;border-color:#666;background:rgba(255,255,255,.05)',
+    '운영총무':'color:#FF6D00;border-color:#FF6D00;background:rgba(255,109,0,.12)',
+    '재정총무':'color:#FF6D00;border-color:#FF6D00;background:rgba(255,109,0,.08)'
+  };
+  var curRole = (S.memberRoles||{})[name] || '회원';
+  var nameEl = el('mo-role-name');
+  if (nameEl) nameEl.textContent = '⚽ ' + name + ' · 직책 변경';
+  // 직책 버튼들
+  var btnsEl = el('mo-role-btns');
+  if (btnsEl) {
+    btnsEl.innerHTML = ROLES.map(function(r){
+      var isActive = r === curRole;
+      var s = ROLE_STYLE[r];
+      return '<button onclick="setMemberRoleFromModal(\''+r+'\')" style="' +
+        'width:100%;padding:11px;border-radius:10px;border:1px solid;text-align:left;' +
+        'font-size:14px;font-weight:'+(isActive?'700':'400')+';cursor:pointer;font-family:\'Noto Sans KR\';' +
+        'transition:.15s;'+s+'">' +
+        (isActive ? '✓ ' : '') + r +
+      '</button>';
+    }).join('');
+  }
+  // 기기 초기화 버튼 - 등록된 기기 있을 때만 표시
+  var dn = S.deviceNames || {};
+  var regDid = null;
+  Object.keys(dn).forEach(function(k){ if(dn[k]===name) regDid=k; });
+  var resetBtn = el('mo-role-reset-btn');
+  if (resetBtn) resetBtn.style.display = regDid ? 'block' : 'none';
+  resetBtn._did = regDid;
+
+  var mo = el('mo-role'); if (mo) mo.classList.add('op');
+}
+
+function setMemberRoleFromModal(role) {
+  setMemberRole(_roleTargetName, role);
+  closeModal('mo-role');
+}
+
+function deleteMemberFromRole() {
+  if (!confirm(_roleTargetName + '을(를) 팀원 목록에서 삭제할까요?')) return;
+  S.members = (S.members||[]).filter(function(n){ return n !== _roleTargetName; });
+  if (S.memberRoles) delete S.memberRoles[_roleTargetName];
+  saveState(); renderAdmin(); renderDues();
+  closeModal('mo-role');
+  showToast('🗑️ ' + _roleTargetName + ' 삭제됐습니다');
+}
+
+function resetDeviceFromRole() {
+  var dn = S.deviceNames || {};
+  var regDid = null;
+  Object.keys(dn).forEach(function(k){ if(dn[k]===_roleTargetName) regDid=k; });
+  if (!regDid) return;
+  delete S.deviceNames[regDid];
+  if (regDid === window._deviceId) { me=''; localStorage.removeItem('hd_me'); updateNameLbl(); }
+  saveState(); renderAdmin();
+  closeModal('mo-role');
+  showToast('🔓 ' + _roleTargetName + ' 기기 초기화됐습니다');
 }
 
 function setMemberRole(name, role) {
