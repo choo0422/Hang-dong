@@ -358,14 +358,26 @@ textarea{resize:vertical;min-height:80px}
       </div>
       <div style="height:8px"></div>
 
-      <!-- 운동장 주소 -->
-      <div style="font-size:12px;color:var(--mut);margin-bottom:4px">📍 운동장 주소 <span style="font-weight:400">(선택)</span></div>
-      <div style="display:flex;gap:6px">
-        <input type="text" id="ev-addr" placeholder="예: 서울 강서구 항동 풋살파크" style="margin-bottom:0;flex:1">
-        <button onclick="previewAddr()" style="background:var(--c1);border:1px solid var(--brd);color:var(--txt);border-radius:8px;padding:10px 12px;font-size:12px;cursor:pointer;flex-shrink:0;font-family:'Noto Sans KR'">🗺️ 확인</button>
+      <!-- 운동장 주소 + 좌표 -->
+      <div style="font-size:12px;color:var(--mut);margin-bottom:4px">📍 운동장 이름 <span style="font-weight:400">(선택)</span></div>
+      <input type="text" id="ev-addr" placeholder="예: 안양천 C구장" oninput="onStadiumInput(this.value)">
+
+      <!-- 저장된 구장 자동완성 -->
+      <div id="ev-stadium-suggest" style="display:none;margin-top:-4px;margin-bottom:8px;background:var(--c1);border:1px solid var(--brd);border-radius:8px;overflow:hidden"></div>
+
+      <!-- 좌표 입력 -->
+      <div style="font-size:12px;color:var(--mut);margin-bottom:4px">
+        🌐 구글지도 좌표 붙여넣기
+        <span style="font-weight:400;color:var(--mut)"> (선택 · 날씨 표시용)</span>
       </div>
-      <div id="ev-addr-preview" style="display:none;margin-top:6px;margin-bottom:8px;padding:8px 12px;background:rgba(255,109,0,.08);border:1px solid rgba(255,109,0,.3);border-radius:8px;font-size:12px;color:var(--g);cursor:pointer" onclick="openNaverMap((document.getElementById('ev-addr')||{}).value)">
-        📍 <span id="ev-addr-text"></span> → 탭하면 네이버지도로 열기
+      <div style="display:flex;gap:6px;margin-bottom:4px">
+        <input type="text" id="ev-coord-paste" placeholder="37.1234, 126.5678  붙여넣기" style="margin-bottom:0;flex:1;font-size:13px" oninput="parseCoord(this.value)">
+      </div>
+      <div id="ev-coord-result" style="display:none;margin-bottom:8px;padding:7px 12px;background:rgba(255,109,0,.08);border:1px solid rgba(255,109,0,.3);border-radius:8px;font-size:12px;color:var(--g)"></div>
+      <input type="hidden" id="ev-lat">
+      <input type="hidden" id="ev-lng">
+      <div style="font-size:11px;color:var(--mut);margin-bottom:10px">
+        💡 <a href="https://maps.google.com" target="_blank" style="color:var(--g)">구글지도</a>에서 구장 우클릭 → 좌표 복사 → 여기 붙여넣기
       </div>
 
       <!-- 약도 사진 -->
@@ -543,8 +555,15 @@ textarea{resize:vertical;min-height:80px}
     </div>
     <div style="height:8px"></div>
 
-    <div style="font-size:12px;color:var(--mut);margin-bottom:4px">📍 운동장 주소</div>
-    <input type="text" id="me-addr" placeholder="예: 서울 강서구 항동 풋살파크">
+    <div style="font-size:12px;color:var(--mut);margin-bottom:4px">📍 운동장 이름</div>
+    <input type="text" id="me-addr" placeholder="예: 안양천 C구장" oninput="onMeStadiumInput(this.value)">
+    <div id="me-stadium-suggest" style="display:none;margin-top:-4px;margin-bottom:8px;background:var(--c1);border:1px solid var(--brd);border-radius:8px;overflow:hidden"></div>
+
+    <div style="font-size:12px;color:var(--mut);margin-bottom:4px">🌐 구글지도 좌표 붙여넣기</div>
+    <input type="text" id="me-coord-paste" placeholder="37.1234, 126.5678  붙여넣기" style="font-size:13px" oninput="parseMeCoord(this.value)">
+    <div id="me-coord-result" style="display:none;margin-top:-4px;margin-bottom:8px;padding:7px 12px;background:rgba(255,109,0,.08);border:1px solid rgba(255,109,0,.3);border-radius:8px;font-size:12px;color:var(--g)"></div>
+    <input type="hidden" id="me-lat">
+    <input type="hidden" id="me-lng">
 
     <div style="font-size:12px;color:var(--mut);margin-bottom:6px">🗺️ 약도 사진</div>
     <label for="me-map-img" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border:2px dashed var(--brd);border-radius:10px;cursor:pointer;color:var(--mut);font-size:13px;margin-bottom:6px" id="me-map-label">
@@ -753,39 +772,30 @@ function refreshWeather() {
   var ev = upcoming[0];
   var gameDate = ev.date;
   var addr = (ev.addr || '').trim();
+  var lat  = parseFloat(ev.lat) || 0;
+  var lng  = parseFloat(ev.lng) || 0;
 
-  if (!addr) {
-    if (locEl) locEl.textContent = '';
+  // 저장된 좌표 없으면 구장 DB에서 찾기
+  if ((!lat || !lng) && addr) {
+    var st = getStadiums();
+    if (st[addr]) { lat = st[addr].lat; lng = st[addr].lng; }
+  }
+
+  if (locEl) locEl.textContent = addr ? '📍 ' + addr : '';
+
+  if (!lat || !lng) {
     if (gameEl) gameEl.innerHTML =
       '<div style="text-align:center;padding:12px 0;color:var(--mut);font-size:12px">' +
-      '운동 투표에 구장 주소를 입력하면<br>날씨 예보가 표시됩니다 ⛅</div>';
+      (addr ? '구장 좌표가 없어요<br><span style="font-size:11px">관리자가 투표 생성 시 좌표를 입력하면 표시됩니다</span>'
+            : '운동 투표에 구장 정보를 입력하면<br>날씨 예보가 표시됩니다 ⛅') +
+      '</div>';
     return;
   }
 
-  if (locEl) locEl.textContent = '📍 ' + addr;
   if (gameEl) gameEl.innerHTML =
     '<div style="text-align:center;padding:10px 0;color:var(--mut);font-size:12px">날씨 불러오는 중...</div>';
 
-  // Nominatim(OpenStreetMap) 무료 geocoding - 도메인 제한 없음
-  fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(addr) + '&format=json&limit=1&countrycodes=kr', {
-    headers: { 'Accept-Language': 'ko' }
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(res){
-    if (res && res.length) {
-      var lat = parseFloat(res[0].lat);
-      var lng = parseFloat(res[0].lon);
-      var name = res[0].display_name ? res[0].display_name.split(',')[0] : addr;
-      if (locEl) locEl.textContent = '📍 ' + name;
-      loadGameWeather(lat, lng, gameDate, ev, updEl);
-    } else {
-      // 못 찾으면 카카오 시도
-      tryKakaoGeo(addr, gameDate, ev, updEl, locEl, gameEl);
-    }
-  })
-  .catch(function(){
-    tryKakaoGeo(addr, gameDate, ev, updEl, locEl, gameEl);
-  });
+  loadGameWeather(lat, lng, gameDate, ev, updEl);
 }
 
 function tryKakaoGeo(addr, gameDate, ev, updEl, locEl, gameEl) {
@@ -1905,7 +1915,177 @@ function toggleMapImg(id) {
   if (arrow) arrow.textContent = isOpen ? '▼' : '▲';
 }
 
-// ── 주소 미리보기 ──
+// ── 구장 좌표 파싱 (구글지도 복사 형식) ──
+// 구글지도 우클릭 복사: "37.1234, 126.5678" 형식
+function parseCoord(val) {
+  var result = el('ev-coord-result');
+  var latEl  = el('ev-lat');
+  var lngEl  = el('ev-lng');
+  if (!val.trim()) {
+    if (result) result.style.display = 'none';
+    if (latEl) latEl.value = '';
+    if (lngEl) lngEl.value = '';
+    return;
+  }
+  // 숫자 두 개 추출 (소수점, 음수 포함)
+  var nums = val.match(/-?\d+\.?\d*/g);
+  if (nums && nums.length >= 2) {
+    var lat = parseFloat(nums[0]);
+    var lng = parseFloat(nums[1]);
+    if (lat >= 33 && lat <= 39 && lng >= 124 && lng <= 132) {
+      if (latEl) latEl.value = lat;
+      if (lngEl) lngEl.value = lng;
+      if (result) {
+        result.style.display = 'block';
+        result.innerHTML = '✅ 위도 <strong>'+lat+'</strong> · 경도 <strong>'+lng+'</strong>';
+      }
+      // 구장 이름이 있으면 자동 저장
+      autoSaveStadium();
+      return;
+    }
+  }
+  if (result) {
+    result.style.display = 'block';
+    result.style.color = 'var(--red)';
+    result.innerHTML = '⚠️ 좌표를 인식하지 못했어요. 다시 붙여넣기 해주세요';
+    setTimeout(function(){ result.style.color = 'var(--g)'; }, 2000);
+  }
+}
+
+function parseMeCoord(val) {
+  var result = el('me-coord-result');
+  var latEl  = el('me-lat');
+  var lngEl  = el('me-lng');
+  if (!val.trim()) {
+    if (result) result.style.display = 'none';
+    if (latEl) latEl.value = '';
+    if (lngEl) lngEl.value = '';
+    return;
+  }
+  var nums = val.match(/-?\d+\.?\d*/g);
+  if (nums && nums.length >= 2) {
+    var lat = parseFloat(nums[0]);
+    var lng = parseFloat(nums[1]);
+    if (lat >= 33 && lat <= 39 && lng >= 124 && lng <= 132) {
+      if (latEl) latEl.value = lat;
+      if (lngEl) lngEl.value = lng;
+      if (result) {
+        result.style.display = 'block';
+        result.innerHTML = '✅ 위도 <strong>'+lat+'</strong> · 경도 <strong>'+lng+'</strong>';
+      }
+      autoSaveMeStadium();
+      return;
+    }
+  }
+  if (result) {
+    result.style.display = 'block';
+    result.innerHTML = '⚠️ 좌표를 인식하지 못했어요';
+  }
+}
+
+// ── 구장 자동완성 (저장된 구장 목록) ──
+function getStadiums() {
+  try { return JSON.parse(localStorage.getItem('hd_stadiums') || '{}'); } catch(e) { return {}; }
+}
+function saveStadiums(obj) {
+  localStorage.setItem('hd_stadiums', JSON.stringify(obj));
+}
+
+function autoSaveStadium() {
+  var name = ((el('ev-addr')||{}).value || '').trim();
+  var lat  = (el('ev-lat')||{}).value;
+  var lng  = (el('ev-lng')||{}).value;
+  if (name && lat && lng) {
+    var st = getStadiums();
+    st[name] = { lat: parseFloat(lat), lng: parseFloat(lng) };
+    saveStadiums(st);
+  }
+}
+
+function autoSaveMeStadium() {
+  var name = ((el('me-addr')||{}).value || '').trim();
+  var lat  = (el('me-lat')||{}).value;
+  var lng  = (el('me-lng')||{}).value;
+  if (name && lat && lng) {
+    var st = getStadiums();
+    st[name] = { lat: parseFloat(lat), lng: parseFloat(lng) };
+    saveStadiums(st);
+  }
+}
+
+function onStadiumInput(val) {
+  var suggest = el('ev-stadium-suggest');
+  if (!suggest) return;
+  if (!val.trim()) { suggest.style.display = 'none'; return; }
+  var st = getStadiums();
+  var matches = Object.keys(st).filter(function(n){
+    return n.indexOf(val) !== -1;
+  });
+  if (!matches.length) { suggest.style.display = 'none'; return; }
+  suggest.style.display = 'block';
+  suggest.innerHTML = matches.map(function(n){
+    return '<div onclick="applyStadium(\''+n.replace(/'/g,'\\\'')+'\')" ' +
+      'style="padding:9px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--brd);' +
+      'display:flex;align-items:center;justify-content:space-between">' +
+      '<span>📍 '+n+'</span>' +
+      '<span style="font-size:11px;color:var(--mut)">좌표 자동입력 ▶</span>' +
+    '</div>';
+  }).join('');
+}
+
+function onMeStadiumInput(val) {
+  var suggest = el('me-stadium-suggest');
+  if (!suggest) return;
+  if (!val.trim()) { suggest.style.display = 'none'; return; }
+  var st = getStadiums();
+  var matches = Object.keys(st).filter(function(n){ return n.indexOf(val) !== -1; });
+  if (!matches.length) { suggest.style.display = 'none'; return; }
+  suggest.style.display = 'block';
+  suggest.innerHTML = matches.map(function(n){
+    return '<div onclick="applyMeStadium(\''+n.replace(/'/g,'\\\'')+'\')" ' +
+      'style="padding:9px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--brd);' +
+      'display:flex;align-items:center;justify-content:space-between">' +
+      '<span>📍 '+n+'</span>' +
+      '<span style="font-size:11px;color:var(--mut)">좌표 자동입력 ▶</span>' +
+    '</div>';
+  }).join('');
+}
+
+function applyStadium(name) {
+  var st = getStadiums();
+  var info = st[name];
+  if (!info) return;
+  var addrEl = el('ev-addr'); if (addrEl) addrEl.value = name;
+  var latEl  = el('ev-lat');  if (latEl)  latEl.value  = info.lat;
+  var lngEl  = el('ev-lng');  if (lngEl)  lngEl.value  = info.lng;
+  var paste  = el('ev-coord-paste'); if (paste) paste.value = info.lat + ', ' + info.lng;
+  var result = el('ev-coord-result');
+  if (result) {
+    result.style.display = 'block';
+    result.innerHTML = '✅ 위도 <strong>'+info.lat+'</strong> · 경도 <strong>'+info.lng+'</strong>';
+  }
+  var suggest = el('ev-stadium-suggest'); if (suggest) suggest.style.display = 'none';
+  showToast('📍 '+name+' 좌표 자동입력됐습니다!');
+}
+
+function applyMeStadium(name) {
+  var st = getStadiums();
+  var info = st[name];
+  if (!info) return;
+  var addrEl = el('me-addr'); if (addrEl) addrEl.value = name;
+  var latEl  = el('me-lat');  if (latEl)  latEl.value  = info.lat;
+  var lngEl  = el('me-lng');  if (lngEl)  lngEl.value  = info.lng;
+  var paste  = el('me-coord-paste'); if (paste) paste.value = info.lat + ', ' + info.lng;
+  var result = el('me-coord-result');
+  if (result) {
+    result.style.display = 'block';
+    result.innerHTML = '✅ 위도 <strong>'+info.lat+'</strong> · 경도 <strong>'+info.lng+'</strong>';
+  }
+  var suggest = el('me-stadium-suggest'); if (suggest) suggest.style.display = 'none';
+  showToast('📍 '+name+' 좌표 자동입력됐습니다!');
+}
+
+// ── 주소 미리보기 (네이버지도) ──
 function previewAddr() {
   var addr = (el('ev-addr')||{}).value.trim();
   if (!addr) { showToast('주소를 입력하세요'); return; }
@@ -1930,17 +2110,21 @@ function createExtraVote() {
   var dlDate   = (el('ev-dl-date')||{}).value;
   var dlTime   = (el('ev-dl-time')||{}).value;
   var addr     = (el('ev-addr')||{}).value.trim();
+  var lat      = parseFloat((el('ev-lat')||{}).value) || 0;
+  var lng      = parseFloat((el('ev-lng')||{}).value) || 0;
   var opponent = evType==='match' ? (el('ev-opponent')||{}).value.trim() : '';
   if (!title||!date||!dlDate) { showToast('제목, 운동날짜, 마감날짜를 입력하세요'); return; }
   if (!S.extraVotes) S.extraVotes = [];
+  // 구장 이름+좌표 자동 저장
+  if (addr && lat && lng) {
+    var st = getStadiums(); st[addr] = { lat: lat, lng: lng }; saveStadiums(st);
+  }
   var evObj = {
     id: 'ev_'+Date.now(),
-    title: title,
-    matchType: evType,
-    opponent: opponent,
+    title: title, matchType: evType, opponent: opponent,
     date: date, stime: stime, etime: etime,
     deadlineDate: dlDate, deadlineTime: dlTime,
-    addr: addr,
+    addr: addr, lat: lat, lng: lng,
     mapImg: evMapImgData || '',
     active: true, votes: {}, comments: {}
   };
@@ -1948,8 +2132,12 @@ function createExtraVote() {
   // 폼 초기화
   el('ev-title').value=''; el('ev-date').value=''; el('ev-dl-date').value='';
   if(el('ev-addr')) el('ev-addr').value='';
+  if(el('ev-coord-paste')) el('ev-coord-paste').value='';
+  if(el('ev-coord-result')) el('ev-coord-result').style.display='none';
+  if(el('ev-lat')) el('ev-lat').value='';
+  if(el('ev-lng')) el('ev-lng').value='';
+  if(el('ev-stadium-suggest')) el('ev-stadium-suggest').style.display='none';
   if(el('ev-opponent')) el('ev-opponent').value='';
-  if(el('ev-addr-preview')) el('ev-addr-preview').style.display='none';
   clearMapImg();
   evType = 'self'; setEvType('self');
   saveState(); renderVote(); renderAdmin(); renderHome();
@@ -1988,6 +2176,20 @@ function openEditVote(id) {
   f('me-dl-date', ev.deadlineDate);
   f('me-dl-time', ev.deadlineTime);
   f('me-opponent', ev.opponent);
+  // 좌표 불러오기
+  var meLat = ev.lat || 0;
+  var meLng = ev.lng || 0;
+  if (el('me-lat')) el('me-lat').value = meLat || '';
+  if (el('me-lng')) el('me-lng').value = meLng || '';
+  var meCoordPaste = el('me-coord-paste');
+  var meCoordResult = el('me-coord-result');
+  if (meLat && meLng) {
+    if (meCoordPaste) meCoordPaste.value = meLat + ', ' + meLng;
+    if (meCoordResult) { meCoordResult.style.display='block'; meCoordResult.innerHTML='✅ 위도 <strong>'+meLat+'</strong> · 경도 <strong>'+meLng+'</strong>'; }
+  } else {
+    if (meCoordPaste) meCoordPaste.value = '';
+    if (meCoordResult) meCoordResult.style.display = 'none';
+  }
   meType = ev.matchType || 'self';
   setMeType(meType);
   // 기존 이미지 로드
@@ -2018,6 +2220,12 @@ function saveEditVote() {
   ev.stime       = (el('me-stime')||{}).value;
   ev.etime       = (el('me-etime')||{}).value;
   ev.addr        = (el('me-addr')||{}).value.trim();
+  var meLat = parseFloat((el('me-lat')||{}).value) || 0;
+  var meLng = parseFloat((el('me-lng')||{}).value) || 0;
+  if (meLat && meLng) { ev.lat = meLat; ev.lng = meLng; }
+  if (ev.addr && ev.lat && ev.lng) {
+    var st = getStadiums(); st[ev.addr] = { lat: ev.lat, lng: ev.lng }; saveStadiums(st);
+  }
   ev.mapImg      = meMapImgData !== '' ? meMapImgData : (ev.mapImg || '');
   ev.deadlineDate = dlDate;
   ev.deadlineTime = (el('me-dl-time')||{}).value;
