@@ -318,9 +318,35 @@ textarea{resize:vertical;min-height:80px}
     <!-- 운동 투표 생성 -->
     <div class="asec">
       <div class="at">🗓️ 운동 투표 생성</div>
-      <input type="text" id="ev-title" placeholder="투표 제목 (예: 토요일 번개운동)">
+
+      <!-- 투표 제목 -->
+      <div style="font-size:12px;color:var(--mut);margin-bottom:4px">투표 제목</div>
+      <input type="text" id="ev-title" placeholder="예: 5/10 번개운동">
+
+      <!-- 매치 / 자체전 선택 -->
+      <div style="font-size:12px;color:var(--mut);margin-bottom:8px">운동 종류</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button id="ev-type-self" onclick="setEvType('self')"
+          style="flex:1;padding:10px;border-radius:10px;border:2px solid var(--g);background:rgba(255,109,0,.15);color:var(--g);font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR';transition:.15s">
+          🤼 자체전
+        </button>
+        <button id="ev-type-match" onclick="setEvType('match')"
+          style="flex:1;padding:10px;border-radius:10px;border:2px solid var(--brd);background:transparent;color:var(--mut);font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR';transition:.15s">
+          ⚔️ 매치
+        </button>
+      </div>
+
+      <!-- 상대팀 입력 (매치일 때만) -->
+      <div id="ev-opponent-wrap" style="display:none">
+        <div style="font-size:12px;color:var(--mut);margin-bottom:4px">상대팀 이름</div>
+        <input type="text" id="ev-opponent" placeholder="예: 강서FC">
+      </div>
+
+      <!-- 운동 날짜 -->
       <div style="font-size:12px;color:var(--mut);margin-bottom:4px">운동 날짜</div>
       <input type="date" id="ev-date">
+
+      <!-- 시간 -->
       <div class="two">
         <div>
           <div style="font-size:12px;color:var(--mut);margin-bottom:4px">시작 시간</div>
@@ -332,19 +358,19 @@ textarea{resize:vertical;min-height:80px}
         </div>
       </div>
       <div style="height:8px"></div>
-      <div style="font-size:12px;color:var(--mut);margin-bottom:4px">📍 구장 이름 <span style="color:var(--mut);font-weight:400">(선택)</span></div>
-      <input type="text" id="ev-loc-name" placeholder="예: 항동 풋살파크">
-      <div class="two">
-        <div>
-          <div style="font-size:12px;color:var(--mut);margin-bottom:4px">위도</div>
-          <input type="number" id="ev-loc-lat" placeholder="37.5665" step="0.0001" style="margin-bottom:0">
-        </div>
-        <div>
-          <div style="font-size:12px;color:var(--mut);margin-bottom:4px">경도</div>
-          <input type="number" id="ev-loc-lng" placeholder="126.9780" step="0.0001" style="margin-bottom:0">
-        </div>
+
+      <!-- 운동장 주소 -->
+      <div style="font-size:12px;color:var(--mut);margin-bottom:4px">📍 운동장 주소 <span style="font-weight:400">(선택)</span></div>
+      <div style="display:flex;gap:6px">
+        <input type="text" id="ev-addr" placeholder="예: 서울 강서구 항동 풋살파크" style="margin-bottom:0;flex:1">
+        <button onclick="previewAddr()" style="background:var(--c1);border:1px solid var(--brd);color:var(--txt);border-radius:8px;padding:10px 12px;font-size:12px;cursor:pointer;flex-shrink:0;font-family:'Noto Sans KR'">🗺️ 확인</button>
       </div>
-      <div style="font-size:11px;color:var(--mut);margin-bottom:8px">💡 <a href="https://maps.google.com" target="_blank" style="color:var(--g)">Google Maps</a>에서 구장 우클릭 → 좌표 복사</div>
+      <div id="ev-addr-preview" style="display:none;margin-top:6px;margin-bottom:8px;padding:8px 12px;background:rgba(255,109,0,.08);border:1px solid rgba(255,109,0,.3);border-radius:8px;font-size:12px;color:var(--g);cursor:pointer" onclick="openNaverMap((document.getElementById('ev-addr')||{}).value)">
+        📍 <span id="ev-addr-text"></span> → 탭하면 네이버지도로 열기
+      </div>
+      <div style="height:4px"></div>
+
+      <!-- 투표 마감 -->
       <div style="font-size:12px;color:var(--mut);margin-bottom:4px">투표 마감</div>
       <div class="two">
         <input type="date" id="ev-dl-date" style="margin-bottom:0">
@@ -968,13 +994,41 @@ function renderExtraVoteCard(e, isPast) {
   var votes = e.votes || {};
   var thread = (e.comments && e.comments['_thread']) ? e.comments['_thread'] : [];
 
-  return '<div class="vcard" style="border-color:rgba(255,214,0,.35)">' +
-    '<div style="font-size:10px;color:var(--g);margin-bottom:6px">⚽ 운동 투표</div>' +
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">' +
-      '<div><div style="font-weight:700;font-size:16px">'+e.title+'</div>' +
-      '<div style="font-size:11px;color:var(--mut)">🗓️ '+e.date+' '+(e.stime||'')+'~'+(e.etime||'')+'</div></div>' +
+  // 매치타입 배지
+  var typeBadge = '';
+  if (e.matchType === 'match') {
+    typeBadge = '<span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700;background:rgba(41,121,255,.15);border:1px solid rgba(41,121,255,.4);color:var(--blu);margin-right:6px">⚔️ 매치</span>';
+    if (e.opponent) typeBadge += '<span style="font-size:12px;color:var(--mut)">vs <strong style="color:var(--txt)">'+e.opponent+'</strong></span>';
+  } else {
+    typeBadge = '<span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700;background:rgba(255,109,0,.12);border:1px solid rgba(255,109,0,.3);color:var(--g)">🤼 자체전</span>';
+  }
+
+  // 주소 → 네이버지도 버튼
+  var addrBtn = '';
+  if (e.addr) {
+    var safeAddr = e.addr.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    addrBtn =
+      '<div onclick="openNaverMap(\''+safeAddr+'\')" ' +
+      'style="display:flex;align-items:center;gap:8px;margin:8px 0;padding:9px 12px;' +
+      'background:rgba(3,199,90,.07);border:1px solid rgba(3,199,90,.3);border-radius:10px;cursor:pointer">' +
+      '<span style="font-size:16px">📍</span>' +
+      '<div style="flex:1">' +
+        '<div style="font-size:12px;font-weight:700;color:#03C75A">네이버지도로 보기</div>' +
+        '<div style="font-size:11px;color:var(--mut);margin-top:1px">'+e.addr+'</div>' +
+      '</div>' +
+      '<span style="font-size:12px;color:var(--mut)">▶</span>' +
+      '</div>';
+  }
+
+  return '<div class="vcard" style="border-color:rgba(255,109,0,.3)">' +
+    '<div style="margin-bottom:8px">'+typeBadge+'</div>' +
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px">' +
+      '<div style="font-weight:700;font-size:16px;flex:1;margin-right:8px">'+e.title+'</div>' +
       makeDeadlineChip(dl) +
     '</div>' +
+    '<div style="font-size:12px;color:var(--mut);margin-bottom:4px">🗓️ '+e.date+(e.stime?' &nbsp;⏰ '+e.stime+'~'+e.etime:'')+'</div>' +
+    addrBtn +
+    '<div style="height:8px"></div>' +
     (!past ?
       '<div class="vbar">' +
       '<button class="vbtn go '+(myV==='go'?'sel':'')+'" data-evid="'+e.id+'" data-v="go" onclick="castExtraVote(this)">✅ 참석</button>' +
@@ -989,6 +1043,13 @@ function renderExtraVoteCard(e, isPast) {
       '<button data-evid="'+e.id+'" onclick="postExtraComment(this)" style="background:var(--g);color:#000;border:none;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0">등록</button>' +
     '</div>' +
   '</div>';
+}
+
+// ── 네이버지도 열기 ──
+function openNaverMap(addr) {
+  if (!addr) return;
+  var encoded = encodeURIComponent(addr);
+  window.open('https://map.naver.com/v5/search/'+encoded, '_blank');
 }
 
 function renderVoteGroups(votes) {
@@ -1550,30 +1611,77 @@ function parseBulkRules() {
   showToast('📜 '+rules.length+'개 조항 저장됐습니다!');
 }
 
+// ── 매치타입 선택 ──
+var evType = 'self';
+function setEvType(type) {
+  evType = type;
+  var selfBtn  = el('ev-type-self');
+  var matchBtn = el('ev-type-match');
+  var oppWrap  = el('ev-opponent-wrap');
+  if (type === 'match') {
+    selfBtn.style.borderColor  = 'var(--brd)';
+    selfBtn.style.background   = 'transparent';
+    selfBtn.style.color        = 'var(--mut)';
+    matchBtn.style.borderColor = 'var(--g)';
+    matchBtn.style.background  = 'rgba(255,109,0,.15)';
+    matchBtn.style.color       = 'var(--g)';
+    if (oppWrap) oppWrap.style.display = 'block';
+  } else {
+    matchBtn.style.borderColor = 'var(--brd)';
+    matchBtn.style.background  = 'transparent';
+    matchBtn.style.color       = 'var(--mut)';
+    selfBtn.style.borderColor  = 'var(--g)';
+    selfBtn.style.background   = 'rgba(255,109,0,.15)';
+    selfBtn.style.color        = 'var(--g)';
+    if (oppWrap) oppWrap.style.display = 'none';
+  }
+}
+
+// ── 주소 미리보기 ──
+function previewAddr() {
+  var addr = (el('ev-addr')||{}).value.trim();
+  if (!addr) { showToast('주소를 입력하세요'); return; }
+  var preview = el('ev-addr-preview');
+  var addrText = el('ev-addr-text');
+  if (addrText) addrText.textContent = addr;
+  if (preview) preview.style.display = 'block';
+}
+
+// ── 네이버지도 열기 ──
+function openNaverMap(addr) {
+  if (!addr) return;
+  var encoded = encodeURIComponent(addr);
+  window.open('https://map.naver.com/v5/search/'+encoded, '_blank');
+}
+
 function createExtraVote() {
-  var title   = (el('ev-title')||{}).value.trim();
-  var date    = (el('ev-date')||{}).value;
-  var stime   = (el('ev-stime')||{}).value;
-  var etime   = (el('ev-etime')||{}).value;
-  var dlDate  = (el('ev-dl-date')||{}).value;
-  var dlTime  = (el('ev-dl-time')||{}).value;
-  var locName = (el('ev-loc-name')||{}).value.trim();
-  var locLat  = parseFloat((el('ev-loc-lat')||{}).value);
-  var locLng  = parseFloat((el('ev-loc-lng')||{}).value);
+  var title    = (el('ev-title')||{}).value.trim();
+  var date     = (el('ev-date')||{}).value;
+  var stime    = (el('ev-stime')||{}).value;
+  var etime    = (el('ev-etime')||{}).value;
+  var dlDate   = (el('ev-dl-date')||{}).value;
+  var dlTime   = (el('ev-dl-time')||{}).value;
+  var addr     = (el('ev-addr')||{}).value.trim();
+  var opponent = evType==='match' ? (el('ev-opponent')||{}).value.trim() : '';
   if (!title||!date||!dlDate) { showToast('제목, 운동날짜, 마감날짜를 입력하세요'); return; }
   if (!S.extraVotes) S.extraVotes = [];
-  var evObj = { id:'ev_'+Date.now(), title:title, date:date, stime:stime, etime:etime, deadlineDate:dlDate, deadlineTime:dlTime, active:true, votes:{}, comments:{} };
-  // 구장 위치가 입력됐으면 저장 & 날씨 갱신
-  if (locLat && locLng) {
-    evObj.location = { name: locName||'구장', lat: locLat, lng: locLng };
-    S.location = { name: locName||'구장', lat: locLat, lng: locLng };
-    setTimeout(refreshWeather, 300);
-  }
+  var evObj = {
+    id: 'ev_'+Date.now(),
+    title: title,
+    matchType: evType,
+    opponent: opponent,
+    date: date, stime: stime, etime: etime,
+    deadlineDate: dlDate, deadlineTime: dlTime,
+    addr: addr,
+    active: true, votes: {}, comments: {}
+  };
   S.extraVotes.push(evObj);
+  // 폼 초기화
   el('ev-title').value=''; el('ev-date').value=''; el('ev-dl-date').value='';
-  if(el('ev-loc-name')) el('ev-loc-name').value='';
-  if(el('ev-loc-lat')) el('ev-loc-lat').value='';
-  if(el('ev-loc-lng')) el('ev-loc-lng').value='';
+  if(el('ev-addr')) el('ev-addr').value='';
+  if(el('ev-opponent')) el('ev-opponent').value='';
+  if(el('ev-addr-preview')) el('ev-addr-preview').style.display='none';
+  evType = 'self'; setEvType('self');
   saveState(); renderVote(); renderAdmin(); renderHome();
   showToast('🗓️ 투표 생성됐습니다!');
 }
