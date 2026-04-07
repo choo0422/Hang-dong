@@ -1225,6 +1225,39 @@ function renderExtraVoteCard(e, isPast) {
       '</div>';
   }
 
+  // 미투표자 (휴회중 제외)
+  var leave = S.memberLeave || {};
+  var activeMembers = (S.members||[]).filter(function(n){ return !leave[n]; });
+  var votedNames = Object.keys(votes);
+  var nonVoters = activeMembers.filter(function(n){ return votedNames.indexOf(n) === -1; });
+  var nonVoterSection = '';
+  if (activeMembers.length) {
+    var safeId = e.id.replace(/[^a-zA-Z0-9]/g,'_');
+    nonVoterSection =
+      '<div style="margin:10px 0 0">' +
+        '<button onclick="toggleNonVoters(\''+safeId+'\')" ' +
+          'style="width:100%;display:flex;align-items:center;justify-content:space-between;' +
+          'padding:8px 12px;background:var(--c1);border:1px solid var(--brd);border-radius:10px;' +
+          'color:var(--mut);font-size:12px;font-weight:700;cursor:pointer">' +
+          '<span>🔔 미투표자 <span style="color:var(--red);margin-left:4px">'+nonVoters.length+'명</span></span>' +
+          '<span id="nv-arrow-'+safeId+'">▼</span>' +
+        '</button>' +
+        '<div id="nv-'+safeId+'" style="display:none;margin-top:6px;padding:10px 12px;background:var(--c1);border:1px solid var(--brd);border-radius:10px">' +
+          (nonVoters.length ?
+            '<div style="font-size:13px;color:var(--txt);line-height:2;margin-bottom:8px">'+nonVoters.join(' · ')+'</div>' +
+            '<button onclick="copyNonVoters(\''+safeId+'\')" ' +
+              'style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--brd);background:var(--c2);' +
+              'color:var(--txt);font-size:12px;font-weight:700;cursor:pointer;font-family:\'Noto Sans KR\'">' +
+              '📋 미투표자 이름 복사' +
+            '</button>' :
+            '<div style="text-align:center;color:var(--g);font-size:13px;padding:4px 0">✅ 모두 투표 완료!</div>'
+          ) +
+        '</div>' +
+      '</div>';
+    // id에 nonVoters 데이터 저장
+    window['_nv_'+safeId] = nonVoters;
+  }
+
   return '<div class="vcard" style="border-color:rgba(255,109,0,.3)">' +
     '<div style="margin-bottom:8px">'+typeBadge+'</div>' +
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px">' +
@@ -1242,6 +1275,7 @@ function renderExtraVoteCard(e, isPast) {
       '<button class="vbtn no '+(myV==='no'?'sel':'')+'" data-evid="'+e.id+'" data-v="no" onclick="castExtraVote(this)">❌ 불참</button>' +
       '</div>' : '') +
     renderVoteGroups(votes) +
+    nonVoterSection +
     '<div class="ct" style="margin-top:12px;margin-bottom:6px">💬 댓글</div>' +
     (thread.length ? '<div style="margin-bottom:8px">'+makeCommentRows(thread,'data-evid="'+e.id+'"','delExtraComment')+'</div>' : '') +
     '<div style="display:flex;gap:6px">' +
@@ -1256,6 +1290,30 @@ function openNaverMap(addr) {
   if (!addr) return;
   var encoded = encodeURIComponent(addr);
   window.open('https://map.naver.com/v5/search/'+encoded, '_blank');
+}
+
+// ── 미투표자 접었다 펼치기 / 복사 ──
+function toggleNonVoters(safeId) {
+  var wrap  = el('nv-'+safeId);
+  var arrow = el('nv-arrow-'+safeId);
+  if (!wrap) return;
+  var isOpen = wrap.style.display !== 'none';
+  wrap.style.display = isOpen ? 'none' : 'block';
+  if (arrow) arrow.textContent = isOpen ? '▼' : '▲';
+}
+
+function copyNonVoters(safeId) {
+  var names = window['_nv_'+safeId] || [];
+  if (!names.length) return;
+  var text = names.join(' ');
+  navigator.clipboard.writeText(text).then(function(){
+    showToast('📋 미투표자 '+names.length+'명 복사됐습니다!');
+  }).catch(function(){
+    var e2 = document.createElement('textarea');
+    e2.value = text; document.body.appendChild(e2); e2.select();
+    document.execCommand('copy'); document.body.removeChild(e2);
+    showToast('📋 미투표자 '+names.length+'명 복사됐습니다!');
+  });
 }
 
 function renderVoteGroups(votes) {
