@@ -216,18 +216,6 @@ textarea{resize:vertical;min-height:80px}
 
 <!-- STATS -->
 <div class="pg" id="pg-stats">
-  <div style="font-family:'Noto Sans KR';font-weight:700;font-size:15px;color:var(--yel);margin-bottom:10px;padding:0 2px">🏆 MOM</div>
-  <div class="card" id="sm-vote" style="display:none;border-color:rgba(255,214,0,.35)">
-    <div style="font-family:'Noto Sans KR';font-weight:700;font-size:13px;color:var(--yel);margin-bottom:4px">MOM 투표 진행 중 ⚡</div>
-    <div style="font-size:11px;color:var(--mut);margin-bottom:10px" id="sm-timer">마감까지 계산 중...</div>
-    <div style="font-size:12px;color:var(--mut);margin-bottom:12px">참석자만 · 익명 · 1인 1표</div>
-    <div class="mgrid" id="sm-grid"></div>
-    <div style="height:12px"></div>
-    <button class="btn btng btnsm" onclick="submitMomVote()">⭐ 투표하기</button>
-  </div>
-  <div id="sm-done" style="display:none" class="notice">✅ MOM 투표에 참여했습니다!</div>
-  <div id="sm-noatt" style="display:none" class="notice">오늘 운동 참석자만 MOM 투표에 참여할 수 있습니다</div>
-
   <div class="card">
     <div class="ct">명예의 전당 🏅</div>
     <div id="sm-hall"><div style="color:var(--mut);font-size:13px;text-align:center;padding:8px 0">아직 기록이 없습니다</div></div>
@@ -307,16 +295,6 @@ textarea{resize:vertical;min-height:80px}
       <div style="font-size:12px;color:var(--mut);margin-bottom:4px">내용</div>
       <textarea id="a-notice-body" rows="5" placeholder="공지 내용을 입력하세요&#10;줄바꿈도 그대로 표시됩니다"></textarea>
       <button class="btn btng btnsm" onclick="saveNotice()">📢 공지사항 저장</button>
-    </div>
-
-    <!-- 참석자 등록 + MOM 오픈 -->
-    <div class="asec">
-      <div class="at">🏆 오늘 참석자 등록 & MOM 오픈</div>
-      <div style="font-size:12px;color:var(--mut);margin-bottom:8px">저장하면 참석자들에게 12시간 MOM 투표 오픈</div>
-      <input type="date" id="a-date">
-      <div style="font-size:12px;color:var(--mut);margin-bottom:6px">참석자 선택</div>
-      <div class="chips" id="a-att"></div>
-      <button class="btn btng" onclick="saveAttendees()">참석자 저장 + MOM 투표 열기 🏆</button>
     </div>
 
     <!-- 운동 투표 생성 -->
@@ -1154,52 +1132,76 @@ function renderHome() {
 function renderMomBanner() {
   var momBanner = el('h-mom-banner');
   if (!momBanner) return;
+
+  checkMomExpiry();
+
   if (!S.momActive || !S.momDeadline) { momBanner.innerHTML = ''; return; }
-  var momDl = new Date(S.momDeadline);
-  var momLeft = deadlineDiffStr(momDl);
-  var last = S.matches && S.matches.length ? S.matches[S.matches.length-1] : null;
-  var isAtt = last && last.attendees && last.attendees.indexOf(me) !== -1;
-  var voted = S.momVoters && S.momVoters[me];
-  var matchDate = last ? last.date : '';
-  var dateLabel = '';
-  if (matchDate) { var md = new Date(matchDate); dateLabel = (md.getMonth()+1)+'월 '+md.getDate()+'일 운동'; }
-  var attList = (last && last.attendees) ? last.attendees.filter(function(n){ return n!==me; }) : [];
+
+  var momDl    = new Date(S.momDeadline);
+  var momLeft  = deadlineDiffStr(momDl);
+  var last     = S.matches && S.matches.length ? S.matches[S.matches.length-1] : null;
+  if (!last) { momBanner.innerHTML = ''; return; }
+
+  var isAtt  = last.attendees && last.attendees.indexOf(me) !== -1;
+  var voted  = S.momVoters && S.momVoters[me];
+  var momVotes = last.momVotes || {};
+  var totalV   = Object.values(momVotes).reduce(function(a,b){ return a+b; }, 0);
+  var topVotes = Object.keys(momVotes).sort(function(a,b){ return momVotes[b]-momVotes[a]; });
+
+  // 현재 투표 현황 바 (참석자 전원 볼 수 있음)
+  var voteBar = totalV ?
+    '<div style="margin-top:10px">' +
+    topVotes.map(function(n){
+      var pct = Math.round(momVotes[n]/totalV*100);
+      return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">' +
+        '<span style="font-size:12px;min-width:52px;color:var(--txt)">'+n+'</span>' +
+        '<div style="flex:1;height:5px;background:var(--brd);border-radius:3px;overflow:hidden">' +
+          '<div style="height:100%;background:var(--yel);width:'+pct+'%;border-radius:3px"></div>' +
+        '</div>' +
+        '<span style="font-size:11px;color:var(--yel);min-width:28px;text-align:right">'+momVotes[n]+'표</span>' +
+      '</div>';
+    }).join('') + '</div>' : '';
 
   var momContent = '';
+
   if (voted) {
-    var momVotes = (last && last.momVotes) ? last.momVotes : {};
-    var totalV = Object.values(momVotes).reduce(function(a,b){ return a+b; },0);
-    var topVotes = Object.keys(momVotes).sort(function(a,b){ return momVotes[b]-momVotes[a]; });
+    // 투표 완료
     momContent =
-      '<div style="color:var(--g);font-size:13px;margin-bottom:8px">✅ 투표 완료!</div>' +
-      (topVotes.length && totalV ? topVotes.map(function(n){
-        var pct = Math.round(momVotes[n]/totalV*100);
-        return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">' +
-          '<span style="font-size:13px;min-width:50px">'+n+'</span>' +
-          '<div style="flex:1;height:4px;background:var(--brd);border-radius:2px;overflow:hidden"><div style="height:100%;background:var(--yel);width:'+pct+'%"></div></div>' +
-          '<span style="font-size:11px;color:var(--yel);min-width:24px;text-align:right">'+momVotes[n]+'표</span>' +
-        '</div>';
-      }).join('') : '');
-  } else if (isAtt && attList.length) {
+      '<div style="font-size:12px;color:#00C853;font-weight:700;margin-bottom:6px">✅ 투표 완료!</div>' +
+      voteBar;
+  } else if (isAtt) {
+    // 참석자 → 투표 가능
+    var candidates = (last.attendees||[]).filter(function(n){ return n !== me; });
     momContent =
       '<div style="font-size:12px;color:var(--mut);margin-bottom:10px">참석자만 · 익명 · 1인 1표</div>' +
-      '<div style="display:flex;flex-wrap:wrap;margin-bottom:10px">' +
-      attList.map(function(n){
-        var sel = selMomName===n;
+      '<div style="display:flex;flex-wrap:wrap;margin-bottom:12px">' +
+      candidates.map(function(n){
+        var sel = selMomName === n;
         return '<div class="mpl'+(sel?' sel':'')+' data-name="'+n+'" onclick="pickHomeMom(this)">⚽ '+n+'</div>';
       }).join('') + '</div>' +
-      '<button onclick="submitMomVote()" style="width:100%;padding:10px;background:var(--yel);color:#000;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">⭐ 투표하기</button>';
-  } else if (!isAtt) {
-    momContent = '<div style="font-size:12px;color:var(--mut)">참석자만 투표할 수 있어요</div>';
+      '<button onclick="submitMomVote()" style="width:100%;padding:10px;background:var(--yel);color:#000;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:'+(totalV?'10px':'0')+'">⭐ 투표하기</button>' +
+      voteBar;
+  } else {
+    // 불참자 → 현황만 열람
+    momContent =
+      '<div style="font-size:12px;color:var(--mut);margin-bottom:6px">참석자만 투표할 수 있어요 · 현황 열람 중</div>' +
+      (totalV ? voteBar : '<div style="font-size:12px;color:var(--mut);text-align:center;padding:8px 0">아직 투표가 없어요</div>');
   }
+
+  var md = new Date(last.date);
+  var dateLabel = (md.getMonth()+1)+'월 '+md.getDate()+'일';
 
   momBanner.innerHTML =
     '<div class="card" style="border-color:rgba(255,214,0,.5);background:linear-gradient(135deg,#1A1200,#0A0A0A);margin-bottom:12px">' +
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
-      '<div><div style="font-size:10px;color:var(--yel);margin-bottom:2px">🏆 MOM 투표 진행 중</div>' +
-      '<div style="font-weight:700;font-size:15px">'+(dateLabel||'이번')+' MVP는?</div></div>' +
-      '<div style="font-size:11px;color:var(--mut);text-align:right">⏰ '+momLeft+'</div>' +
-    '</div>' + momContent + '</div>';
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">' +
+        '<div>' +
+          '<div style="font-size:10px;color:var(--yel);margin-bottom:3px">🏆 MOM 투표 진행 중</div>' +
+          '<div style="font-weight:700;font-size:16px">'+dateLabel+' MVP는?</div>' +
+          '<div style="font-size:11px;color:var(--mut);margin-top:2px">참석자 '+( last.attendees||[]).length+'명 · 마감 '+momLeft+'</div>' +
+        '</div>' +
+      '</div>' +
+      momContent +
+    '</div>';
 }
 
 function tickDeadline() { renderHome(); }
@@ -1539,7 +1541,16 @@ function delExtraComment(btn) {
 
 // ── STATS & MOM ──
 function renderStats() {
-  renderMomSection();
+  // 명예의 전당
+  var momCnt = {};
+  (S.matches||[]).forEach(function(m){ if (m.mom) momCnt[m.mom]=(momCnt[m.mom]||0)+1; });
+  var hall = Object.keys(momCnt).sort(function(a,b){ return momCnt[b]-momCnt[a]; });
+  setHTML('sm-hall', hall.length ? hall.map(function(n,i){
+    var medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+    return '<div class="rank-item"><div class="rank-num">'+(medal||((i+1)+'위'))+'</div><div class="rank-name">'+n+'</div><div class="rank-val">⭐'+momCnt[n]+'회</div></div>';
+  }).join('') : '<div style="color:var(--mut);font-size:13px;text-align:center;padding:8px 0">아직 기록이 없습니다</div>');
+
+  // 출석 랭킹
   var matches = S.matches || [];
   if (!matches.length) {
     setHTML('s-att','<div style="color:var(--mut);font-size:13px;text-align:center;padding:8px 0">기록 없음</div>');
@@ -1549,48 +1560,13 @@ function renderStats() {
   (S.members||[]).forEach(function(n){ cnt[n]=0; });
   matches.forEach(function(m){ (m.attendees||[]).forEach(function(n){ cnt[n]=(cnt[n]||0)+1; }); });
   var sorted = Object.keys(cnt).filter(function(n){ return cnt[n]>0; }).sort(function(a,b){ return cnt[b]-cnt[a]; });
-  var ROLE_COLOR = {'회장':'var(--yel)','부회장':'var(--yel)','감독':'var(--blu)','코치':'var(--blu)','고문':'var(--mut)','운영총무':'var(--g)','재정총무':'var(--g)'};
+  var ROLE_COLOR = {'회장':'var(--yel)','부회장':'var(--yel)','감독':'var(--blu)','코치':'var(--blu)','고문':'#00C853','운영총무':'var(--g)','재정총무':'var(--g)'};
   setHTML('s-att', sorted.map(function(n,i){
     var medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
     var role = (S.memberRoles||{})[n];
     var roleBadge = role ? '<span style="font-size:10px;padding:1px 7px;border-radius:10px;border:1px solid;margin-left:6px;color:'+ROLE_COLOR[role]+';border-color:'+ROLE_COLOR[role]+';opacity:.8">'+role+'</span>' : '';
-    return '<div class="rank-item">' +
-      '<div class="rank-num">'+(medal||((i+1)+'위'))+'</div>' +
-      '<div class="rank-name">'+n+roleBadge+'</div>' +
-      '<div class="rank-val">'+cnt[n]+'회</div>' +
-    '</div>';
+    return '<div class="rank-item"><div class="rank-num">'+(medal||((i+1)+'위'))+'</div><div class="rank-name">'+n+roleBadge+'</div><div class="rank-val">'+cnt[n]+'회</div></div>';
   }).join('') || '<div style="color:var(--mut);font-size:13px;text-align:center;padding:8px 0">기록 없음</div>');
-}
-
-function renderMomSection() {
-  if (!el('sm-vote')) return;
-  checkMomExpiry();
-  var last = S.matches && S.matches.length ? S.matches[S.matches.length-1] : null;
-  var active = S.momActive;
-  var deadline = S.momDeadline ? new Date(S.momDeadline) : null;
-  var showVote = el('sm-vote'), showDone = el('sm-done'), showNoatt = el('sm-noatt');
-  showVote.style.display='none'; showDone.style.display='none'; showNoatt.style.display='none';
-  if (active && deadline) {
-    var timer = el('sm-timer');
-    if (timer) timer.textContent = '마감까지 ' + deadlineDiffStr(deadline);
-    var isAtt = last && last.attendees && last.attendees.indexOf(me) !== -1;
-    var voted = S.momVoters && S.momVoters[me];
-    if (voted) { showDone.style.display='block'; }
-    else if (isAtt) {
-      showVote.style.display='block';
-      setHTML('sm-grid', (last.attendees||[]).filter(function(n){ return n!==me; }).map(function(n){
-        var sel = selMomName===n;
-        return '<div class="mpl'+(sel?' sel':'')+'" onclick="pickMom(\''+n+'\',this)">⚽ '+n+'</div>';
-      }).join(''));
-    } else { showNoatt.style.display='block'; }
-  }
-  var momCnt = {};
-  (S.matches||[]).forEach(function(m){ if (m.mom) momCnt[m.mom]=(momCnt[m.mom]||0)+1; });
-  var hall = Object.keys(momCnt).sort(function(a,b){ return momCnt[b]-momCnt[a]; });
-  setHTML('sm-hall', hall.length ? hall.map(function(n,i){
-    var medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
-    return '<div class="rank-item"><div class="rank-num">'+(medal||((i+1)+'위'))+'</div><div class="rank-name">'+n+'</div><div class="rank-val">⭐'+momCnt[n]+'회</div></div>';
-  }).join('') : '<div style="color:var(--mut);font-size:13px;text-align:center;padding:8px 0">아직 기록이 없습니다</div>');
 }
 
 function togglePastMom() {
@@ -1674,10 +1650,52 @@ function submitMomVote() {
 }
 
 function checkMomExpiry() {
-  if (!S.momActive || !S.momDeadline) return;
-  if (new Date() > new Date(S.momDeadline)) {
+  // 1. 이미 열린 MOM이 만료됐으면 닫기
+  if (S.momActive && S.momDeadline && new Date() > new Date(S.momDeadline)) {
     S.momActive = false;
-    saveState(); renderAll();
+    saveState();
+  }
+
+  // 2. MOM이 닫혀있을 때 → 방금 끝난 경기 있으면 자동 오픈
+  if (!S.momActive) {
+    var now = new Date();
+    var recentEv = null;
+    (S.extraVotes||[]).forEach(function(e) {
+      if (!e.date || !e.etime) return;
+      var endTime = new Date(e.date + 'T' + e.etime);
+      var momOpenUntil = new Date(endTime.getTime() + 12*60*60*1000);
+      // 경기가 끝난 후 12시간 이내
+      if (now >= endTime && now <= momOpenUntil) {
+        // 이미 이 경기로 MOM을 열었으면 스킵
+        var alreadyOpened = (S.matches||[]).some(function(m){ return m.evId === e.id; });
+        if (!alreadyOpened) recentEv = e;
+      }
+    });
+
+    if (recentEv) {
+      // 투표에서 "참석" 누른 사람 추출 (휴회중 제외)
+      var leave = S.memberLeave || {};
+      var attendees = Object.keys(recentEv.votes||[]).filter(function(n){
+        return recentEv.votes[n] === 'go' && !leave[n];
+      });
+      if (attendees.length > 0) {
+        if (!S.matches) S.matches = [];
+        var endTime = new Date(recentEv.date + 'T' + recentEv.etime);
+        var deadline = new Date(endTime.getTime() + 12*60*60*1000);
+        S.matches.push({
+          evId: recentEv.id,
+          date: recentEv.date,
+          title: recentEv.title,
+          attendees: attendees,
+          mom: null,
+          momVotes: {}
+        });
+        S.momActive = true;
+        S.momVoters = {};
+        S.momDeadline = deadline.toISOString();
+        saveState();
+      }
+    }
   }
 }
 
@@ -1816,11 +1834,6 @@ function renderAdmin() {
   var locNameIn = el('a-loc-name'); if (locNameIn) locNameIn.value = loc.name || '';
   var locLatIn = el('a-loc-lat'); if (locLatIn) locLatIn.value = loc.lat || '';
   var locLngIn = el('a-loc-lng'); if (locLngIn) locLngIn.value = loc.lng || '';
-  // 참석자 칩
-  setHTML('a-att', (S.members||[]).map(function(n){
-    var on = selAtt.indexOf(n) !== -1;
-    return '<div class="chip'+(on?' on':'')+'" onclick="togAtt(\''+n+'\')">'+n+'</div>';
-  }).join(''));
   // 회비 관리
   var bi = S.bankInfo || {};
   var bankNameIn = el('a-bank-name'); if(bankNameIn) bankNameIn.value = bi.bank || '';
