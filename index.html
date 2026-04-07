@@ -502,15 +502,30 @@ textarea{resize:vertical;min-height:80px}
 
 <!-- ROLE MODAL -->
 <div class="mo" id="mo-role">
-  <div class="mbox">
+  <div class="mbox" style="max-height:88vh;overflow-y:auto">
     <h3 id="mo-role-name" style="margin-bottom:16px"></h3>
-    <div id="mo-role-btns" style="display:flex;flex-direction:column;gap:8px"></div>
+    <!-- 직책 버튼들 -->
+    <div id="mo-role-btns" style="display:flex;flex-direction:column;gap:6px"></div>
+    <!-- 구분선 -->
+    <div style="border-top:1px solid var(--brd);margin:12px 0"></div>
+    <!-- 휴회 버튼 -->
+    <button id="mo-leave-btn" onclick="toggleLeaveInput()" style="width:100%;padding:11px;border-radius:10px;border:1px solid #555;background:transparent;color:#888;font-size:14px;cursor:pointer;font-family:'Noto Sans KR';text-align:left">
+      ⏸️ 휴회 처리
+    </button>
+    <!-- 휴회 입력창 (숨겨진 상태) -->
+    <div id="mo-leave-input-wrap" style="display:none;margin-top:8px">
+      <textarea id="mo-leave-text" rows="3" placeholder="휴회 사유 입력&#10;예: 군입대, 부상, 개인사정 등" style="margin-bottom:6px"></textarea>
+      <div style="display:flex;gap:8px">
+        <button onclick="saveLeave()" style="flex:1;padding:10px;border-radius:8px;border:none;background:#555;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR'">💾 휴회 저장</button>
+        <button onclick="cancelLeave()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--brd);background:transparent;color:var(--mut);font-size:13px;cursor:pointer;font-family:'Noto Sans KR'">취소</button>
+      </div>
+    </div>
     <div style="height:8px"></div>
-    <button class="btn btno btnsm" onclick="closeModal('mo-role')">취소</button>
+    <button class="btn btno btnsm" onclick="closeModal('mo-role')">닫기</button>
     <div style="height:8px"></div>
     <div style="display:flex;gap:8px">
-      <button id="mo-role-reset-btn" class="btn btnsm" style="flex:1;background:var(--yel);color:#000;border:none" onclick="resetDeviceFromRole()">🔓 기기 초기화</button>
-      <button id="mo-role-del-btn" class="btn btnr btnsm" style="flex:1" onclick="deleteMemberFromRole()">🗑️ 팀원 삭제</button>
+      <button id="mo-role-reset-btn" class="btn btnsm" style="flex:1;background:var(--yel);color:#000;border:none;display:none" onclick="resetDeviceFromRole()">🔓 기기 초기화</button>
+      <button class="btn btnr btnsm" style="flex:1" onclick="deleteMemberFromRole()">🗑️ 팀원 삭제</button>
     </div>
   </div>
 </div>
@@ -624,6 +639,7 @@ var DEF = {
   rulesUpdated: '',
   deviceNames: {},
   memberRoles: {},
+  memberLeave: {},
   location: { name:'', lat:0, lng:0 },
   settings: { adminPw: '1234' }
 };
@@ -698,7 +714,7 @@ function syncSupabase() {
 }
 
 function ensureKeys() {
-  var keys = ['members','votes','comments','matches','momVoters','duesPaid','extraVotes','rules','deviceNames','location','bankInfo','memberRoles'];
+  var keys = ['members','votes','comments','matches','momVoters','duesPaid','extraVotes','rules','deviceNames','location','bankInfo','memberRoles','memberLeave'];
   for (var i = 0; i < keys.length; i++) {
     if (!S[keys[i]]) S[keys[i]] = cloneObj(DEF[keys[i]]);
   }
@@ -1671,7 +1687,7 @@ function renderAdmin() {
     '부회장': 'color:#FFD600;border-color:#FFD600;background:rgba(255,214,0,.08)',
     '감독':   'color:#2979FF;border-color:#2979FF;background:rgba(41,121,255,.12)',
     '코치':   'color:#2979FF;border-color:#2979FF;background:rgba(41,121,255,.08)',
-    '고문':   'color:#aaa;border-color:#666;background:rgba(255,255,255,.05)',
+    '고문':   'color:#00C853;border-color:#00C853;background:rgba(0,200,83,.1)',
     '운영총무':'color:#FF6D00;border-color:#FF6D00;background:rgba(255,109,0,.12)',
     '재정총무':'color:#FF6D00;border-color:#FF6D00;background:rgba(255,109,0,.08)'
   };
@@ -1682,19 +1698,25 @@ function renderAdmin() {
     Object.keys(ROLE_STYLE).map(function(r){
       return '<span style="font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid;'+ROLE_STYLE[r]+'">'+r+'</span>';
     }).join('') +
+    '<span style="font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid;color:#888;border-color:#555;background:rgba(255,255,255,.04);text-decoration:line-through">휴회</span>' +
     '</div>';
 
   var chips = (S.members||[]).length ?
     '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
     (S.members||[]).map(function(n){
       var role = (S.memberRoles||{})[n] || '회원';
-      var style = ROLE_STYLE[role] || ROLE_STYLE['회원'];
+      var leaveInfo = (S.memberLeave||{})[n]; // 휴회 정보
+      var style = leaveInfo
+        ? 'color:#666;border-color:#444;background:rgba(255,255,255,.03);text-decoration:line-through'
+        : (ROLE_STYLE[role] || ROLE_STYLE['회원']);
       var dn = S.deviceNames || {};
       var regDid = null;
       Object.keys(dn).forEach(function(k){ if(dn[k]===n) regDid=k; });
+      var label = n + (leaveInfo ? '' : '');
       return '<div onclick="openRoleModal(\''+n+'\')" style="padding:5px 12px;border-radius:20px;font-size:13px;cursor:pointer;border:1px solid;transition:.15s;position:relative;'+style+'">' +
-        n +
-        (regDid ? '<span style="position:absolute;top:-3px;right:-3px;width:7px;height:7px;border-radius:50%;background:var(--g);border:1px solid var(--c2)"></span>' : '') +
+        label +
+        (leaveInfo ? '<span style="font-size:10px;margin-left:4px;text-decoration:none;display:inline-block;color:#666">(휴회중)</span>' : '') +
+        (regDid && !leaveInfo ? '<span style="position:absolute;top:-3px;right:-3px;width:7px;height:7px;border-radius:50%;background:var(--g);border:1px solid var(--c2)"></span>' : '') +
       '</div>';
     }).join('') +
     '</div>' :
@@ -1796,36 +1818,108 @@ function openRoleModal(name) {
     '부회장': 'color:#FFD600;border-color:#FFD600;background:rgba(255,214,0,.08)',
     '감독':   'color:#2979FF;border-color:#2979FF;background:rgba(41,121,255,.12)',
     '코치':   'color:#2979FF;border-color:#2979FF;background:rgba(41,121,255,.08)',
-    '고문':   'color:#aaa;border-color:#666;background:rgba(255,255,255,.05)',
+    '고문':   'color:#00C853;border-color:#00C853;background:rgba(0,200,83,.1)',
     '운영총무':'color:#FF6D00;border-color:#FF6D00;background:rgba(255,109,0,.12)',
     '재정총무':'color:#FF6D00;border-color:#FF6D00;background:rgba(255,109,0,.08)'
   };
   var curRole = (S.memberRoles||{})[name] || '회원';
+  var leaveInfo = (S.memberLeave||{})[name];
+
   var nameEl = el('mo-role-name');
-  if (nameEl) nameEl.textContent = '⚽ ' + name + ' · 직책 변경';
+  if (nameEl) nameEl.textContent = '⚽ ' + name + (leaveInfo ? ' · 휴회중' : ' · 직책 변경');
+
   // 직책 버튼들
   var btnsEl = el('mo-role-btns');
   if (btnsEl) {
     btnsEl.innerHTML = ROLES.map(function(r){
-      var isActive = r === curRole;
+      var isActive = r === curRole && !leaveInfo;
       var s = ROLE_STYLE[r];
       return '<button onclick="setMemberRoleFromModal(\''+r+'\')" style="' +
-        'width:100%;padding:11px;border-radius:10px;border:1px solid;text-align:left;' +
-        'font-size:14px;font-weight:'+(isActive?'700':'400')+';cursor:pointer;font-family:\'Noto Sans KR\';' +
+        'width:100%;padding:10px 14px;border-radius:10px;border:1px solid;text-align:left;' +
+        'font-size:13px;font-weight:'+(isActive?'700':'400')+';cursor:pointer;font-family:\'Noto Sans KR\';' +
         'transition:.15s;'+s+'">' +
         (isActive ? '✓ ' : '') + r +
       '</button>';
     }).join('');
   }
-  // 기기 초기화 버튼 - 등록된 기기 있을 때만 표시
+
+  // 휴회 버튼 상태
+  var leaveBtn = el('mo-leave-btn');
+  var leaveWrap = el('mo-leave-input-wrap');
+  var leaveText = el('mo-leave-text');
+  if (leaveBtn) {
+    if (leaveInfo) {
+      leaveBtn.textContent = '▶️ 휴회 사유: ' + leaveInfo;
+      leaveBtn.style.color = '#888';
+      leaveBtn.style.borderColor = '#555';
+      // 탭하면 사유 보여주고 복귀 옵션
+      leaveBtn.onclick = function(){ toggleLeaveInput(true); };
+    } else {
+      leaveBtn.innerHTML = '⏸️ 휴회 처리';
+      leaveBtn.onclick = function(){ toggleLeaveInput(false); };
+    }
+  }
+  if (leaveWrap) leaveWrap.style.display = 'none';
+  if (leaveText) leaveText.value = leaveInfo || '';
+
+  // 기기 초기화 버튼
   var dn = S.deviceNames || {};
   var regDid = null;
   Object.keys(dn).forEach(function(k){ if(dn[k]===name) regDid=k; });
   var resetBtn = el('mo-role-reset-btn');
-  if (resetBtn) resetBtn.style.display = regDid ? 'block' : 'none';
-  resetBtn._did = regDid;
+  if (resetBtn) { resetBtn.style.display = regDid ? 'block' : 'none'; }
 
   var mo = el('mo-role'); if (mo) mo.classList.add('op');
+}
+
+function toggleLeaveInput(showWithReturn) {
+  var wrap = el('mo-leave-input-wrap');
+  var leaveText = el('mo-leave-text');
+  if (!wrap) return;
+  var isOpen = wrap.style.display !== 'none';
+  if (isOpen) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  // 이미 휴회중이면 복귀 버튼도 표시
+  var leaveInfo = (S.memberLeave||{})[_roleTargetName];
+  if (leaveInfo) {
+    wrap.innerHTML =
+      '<textarea id="mo-leave-text" rows="3" placeholder="휴회 사유" style="margin-bottom:6px">'+leaveInfo+'</textarea>' +
+      '<div style="display:flex;gap:8px">' +
+        '<button onclick="saveLeave()" style="flex:1;padding:10px;border-radius:8px;border:none;background:#555;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:\'Noto Sans KR\'">💾 사유 수정</button>' +
+        '<button onclick="cancelLeaveStatus()" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--g);color:#000;font-size:13px;font-weight:700;cursor:pointer;font-family:\'Noto Sans KR\'">✅ 휴회 복귀</button>' +
+      '</div>';
+  } else {
+    wrap.innerHTML =
+      '<textarea id="mo-leave-text" rows="3" placeholder="휴회 사유 입력&#10;예: 군입대, 부상, 개인사정 등" style="margin-bottom:6px"></textarea>' +
+      '<div style="display:flex;gap:8px">' +
+        '<button onclick="saveLeave()" style="flex:1;padding:10px;border-radius:8px;border:none;background:#555;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:\'Noto Sans KR\'">💾 휴회 저장</button>' +
+        '<button onclick="var w=document.getElementById(\'mo-leave-input-wrap\');if(w)w.style.display=\'none\'" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--brd);background:transparent;color:var(--mut);font-size:13px;cursor:pointer;font-family:\'Noto Sans KR\'">취소</button>' +
+      '</div>';
+  }
+}
+
+function saveLeave() {
+  var t = el('mo-leave-text');
+  var reason = t ? t.value.trim() : '';
+  if (!reason) { showToast('휴회 사유를 입력하세요'); return; }
+  if (!S.memberLeave) S.memberLeave = {};
+  S.memberLeave[_roleTargetName] = reason;
+  saveState(); renderAdmin();
+  closeModal('mo-role');
+  showToast('⏸️ ' + _roleTargetName + ' 휴회 처리됐습니다');
+}
+
+function cancelLeave() {
+  var w = el('mo-leave-input-wrap');
+  if (w) w.style.display = 'none';
+}
+
+function cancelLeaveStatus() {
+  if (!S.memberLeave) return;
+  delete S.memberLeave[_roleTargetName];
+  saveState(); renderAdmin();
+  closeModal('mo-role');
+  showToast('✅ ' + _roleTargetName + ' 휴회 복귀됐습니다');
 }
 
 function setMemberRoleFromModal(role) {
