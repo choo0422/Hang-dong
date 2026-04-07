@@ -608,6 +608,7 @@ var DEF = {
   rules: [],
   rulesUpdated: '',
   deviceNames: {},
+  memberRoles: {},
   location: { name:'', lat:0, lng:0 },
   settings: { adminPw: '1234' }
 };
@@ -682,7 +683,7 @@ function syncSupabase() {
 }
 
 function ensureKeys() {
-  var keys = ['members','votes','comments','matches','momVoters','duesPaid','extraVotes','rules','deviceNames','location','bankInfo'];
+  var keys = ['members','votes','comments','matches','momVoters','duesPaid','extraVotes','rules','deviceNames','location','bankInfo','memberRoles'];
   for (var i = 0; i < keys.length; i++) {
     if (!S[keys[i]]) S[keys[i]] = cloneObj(DEF[keys[i]]);
   }
@@ -1230,10 +1231,15 @@ function renderVoteGroups(votes) {
   var goes   = Object.keys(votes).filter(function(n){ return votes[n]==='go'; });
   var maybes = Object.keys(votes).filter(function(n){ return votes[n]==='maybe'; });
   var nos    = Object.keys(votes).filter(function(n){ return votes[n]==='no'; });
+  var ROLE_COLOR = {'회장':'#FFD600','부회장':'#FFD600','감독':'#2979FF','코치':'#2979FF','고문':'#888','운영총무':'#FF6D00','재정총무':'#FF6D00'};
+  function nameWithRole(n) {
+    var role = (S.memberRoles||{})[n];
+    return role ? n+'<span style="font-size:10px;color:'+ROLE_COLOR[role]+';margin-left:4px">('+role+')</span>' : n;
+  }
   function grp(label, color, names) {
     if (!names.length) return '';
     return '<div class="vgroup"><div class="vgroup-label" style="color:'+color+'">'+label+' '+names.length+'명</div>' +
-      '<div class="vgroup-names">'+names.join(' · ')+'</div></div>';
+      '<div class="vgroup-names">'+names.map(nameWithRole).join(' · ')+'</div></div>';
   }
   return grp('✅ 참석','#00C853',goes) + grp('🤔 미정','var(--yel)',maybes) + grp('❌ 불참','var(--red)',nos);
 }
@@ -1364,9 +1370,16 @@ function renderStats() {
   (S.members||[]).forEach(function(n){ cnt[n]=0; });
   matches.forEach(function(m){ (m.attendees||[]).forEach(function(n){ cnt[n]=(cnt[n]||0)+1; }); });
   var sorted = Object.keys(cnt).filter(function(n){ return cnt[n]>0; }).sort(function(a,b){ return cnt[b]-cnt[a]; });
+  var ROLE_COLOR = {'회장':'var(--yel)','부회장':'var(--yel)','감독':'var(--blu)','코치':'var(--blu)','고문':'var(--mut)','운영총무':'var(--g)','재정총무':'var(--g)'};
   setHTML('s-att', sorted.map(function(n,i){
     var medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
-    return '<div class="rank-item"><div class="rank-num">'+(medal||((i+1)+'위'))+'</div><div class="rank-name">'+n+'</div><div class="rank-val">'+cnt[n]+'회</div></div>';
+    var role = (S.memberRoles||{})[n];
+    var roleBadge = role ? '<span style="font-size:10px;padding:1px 7px;border-radius:10px;border:1px solid;margin-left:6px;color:'+ROLE_COLOR[role]+';border-color:'+ROLE_COLOR[role]+';opacity:.8">'+role+'</span>' : '';
+    return '<div class="rank-item">' +
+      '<div class="rank-num">'+(medal||((i+1)+'위'))+'</div>' +
+      '<div class="rank-name">'+n+roleBadge+'</div>' +
+      '<div class="rank-val">'+cnt[n]+'회</div>' +
+    '</div>';
   }).join('') || '<div style="color:var(--mut);font-size:13px;text-align:center;padding:8px 0">기록 없음</div>');
 }
 
@@ -1636,16 +1649,30 @@ function renderAdmin() {
   var admMonthLbl = el('a-dues-month-label'); if(admMonthLbl) admMonthLbl.textContent = ymLabel(duesAdminMonth);
   renderAdminDues();
   // 팀원
-  setHTML('a-members', (S.members||[]).map(function(n){
+  var ROLES = ['회원','회장','부회장','감독','코치','고문','운영총무','재정총무'];
+  var ROLE_COLOR = {'회장':'var(--yel)','부회장':'var(--yel)','감독':'var(--blu)','코치':'var(--blu)','고문':'var(--mut)','운영총무':'var(--g)','재정총무':'var(--g)','회원':'var(--mut)'};
+  setHTML('a-members', (S.members||[]).length ? (S.members||[]).map(function(n){
     var dn = S.deviceNames || {};
     var regDid = null;
     Object.keys(dn).forEach(function(k){ if(dn[k]===n) regDid=k; });
-    return '<div class="sr">' +
-      '<span style="font-size:14px;flex:1">'+n+(regDid?'<span style="font-size:10px;color:var(--g);background:rgba(255,109,0,.1);padding:1px 6px;border-radius:10px;margin-left:6px">등록됨</span>':'')+' </span>' +
-      (regDid ? '<button data-did="'+regDid+'" onclick="deleteDeviceName(this)" style="background:var(--yel);color:#000;border:none;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-right:4px">초기화</button>' : '') +
-      '<button onclick="removeMember(\''+n+'\')" style="background:var(--red);color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer">삭제</button>' +
+    var curRole = (S.memberRoles||{})[n] || '회원';
+    var roleOpts = ROLES.map(function(r){
+      return '<option value="'+r+'"'+(r===curRole?' selected':'')+'>'+r+'</option>';
+    }).join('');
+    return '<div class="sr" style="flex-wrap:wrap;gap:6px;padding:10px 0">' +
+      '<div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0">' +
+        '<span style="font-size:14px;font-weight:500;flex:1">'+n+'</span>' +
+        (regDid ? '<span style="font-size:10px;color:var(--g);background:rgba(255,109,0,.1);padding:1px 6px;border-radius:10px">등록됨</span>' : '') +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:6px;width:100%;margin-top:4px">' +
+        '<select onchange="setMemberRole(\''+n+'\',this.value)" style="flex:1;margin-bottom:0;font-size:12px;padding:5px 8px;color:'+ROLE_COLOR[curRole]+';border-color:var(--brd)">' +
+          roleOpts +
+        '</select>' +
+        (regDid ? '<button data-did="'+regDid+'" onclick="deleteDeviceName(this)" style="background:var(--yel);color:#000;border:none;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer">초기화</button>' : '') +
+        '<button onclick="removeMember(\''+n+'\')" style="background:var(--red);color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer">삭제</button>' +
+      '</div>' +
     '</div>';
-  }).join(''));
+  }).join('') : '<div style="color:var(--mut);font-size:13px;text-align:center;padding:8px 0">등록된 팀원 없음</div>');
   // 이름 등록 현황
   var dn = S.deviceNames || {};
   var devKeys = Object.keys(dn);
@@ -1727,6 +1754,17 @@ function addMember() {
     saveState(); renderAdmin(); renderDues();
   }
   el('a-new-member').value = '';
+}
+
+function setMemberRole(name, role) {
+  if (!S.memberRoles) S.memberRoles = {};
+  if (role === '회원') {
+    delete S.memberRoles[name];
+  } else {
+    S.memberRoles[name] = role;
+  }
+  saveState(); renderAdmin();
+  showToast(name + ' → ' + role);
 }
 
 function removeMember(name) {
