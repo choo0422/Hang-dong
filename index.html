@@ -493,6 +493,61 @@ textarea{resize:vertical;min-height:80px}
   </div>
 </div>
 
+<!-- VOTE EDIT MODAL -->
+<div class="mo" id="mo-edit-vote">
+  <div class="mbox" style="max-height:90vh;overflow-y:auto">
+    <h3>✏️ 투표 수정</h3>
+    <input type="hidden" id="me-id">
+
+    <div style="font-size:12px;color:var(--mut);margin-bottom:4px">투표 제목</div>
+    <input type="text" id="me-title" placeholder="투표 제목">
+
+    <div style="font-size:12px;color:var(--mut);margin-bottom:8px">운동 종류</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button id="me-type-self" onclick="setMeType('self')"
+        style="flex:1;padding:9px;border-radius:10px;border:2px solid var(--g);background:rgba(255,109,0,.15);color:var(--g);font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR'">
+        🤼 자체전
+      </button>
+      <button id="me-type-match" onclick="setMeType('match')"
+        style="flex:1;padding:9px;border-radius:10px;border:2px solid var(--brd);background:transparent;color:var(--mut);font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR'">
+        ⚔️ 매치
+      </button>
+    </div>
+    <div id="me-opponent-wrap" style="display:none">
+      <div style="font-size:12px;color:var(--mut);margin-bottom:4px">상대팀 이름</div>
+      <input type="text" id="me-opponent" placeholder="예: 강서FC">
+    </div>
+
+    <div style="font-size:12px;color:var(--mut);margin-bottom:4px">운동 날짜</div>
+    <input type="date" id="me-date">
+
+    <div class="two">
+      <div>
+        <div style="font-size:12px;color:var(--mut);margin-bottom:4px">시작 시간</div>
+        <input type="time" id="me-stime" style="margin-bottom:0">
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--mut);margin-bottom:4px">종료 시간</div>
+        <input type="time" id="me-etime" style="margin-bottom:0">
+      </div>
+    </div>
+    <div style="height:8px"></div>
+
+    <div style="font-size:12px;color:var(--mut);margin-bottom:4px">📍 운동장 주소</div>
+    <input type="text" id="me-addr" placeholder="예: 서울 강서구 항동 풋살파크">
+
+    <div style="font-size:12px;color:var(--mut);margin-bottom:4px">투표 마감</div>
+    <div class="two">
+      <input type="date" id="me-dl-date" style="margin-bottom:0">
+      <input type="time" id="me-dl-time" style="margin-bottom:0">
+    </div>
+    <div style="height:10px"></div>
+    <button class="btn btng" onclick="saveEditVote()">💾 저장</button>
+    <button class="btn btnr btnsm" onclick="deleteVote()">🗑️ 투표 삭제</button>
+    <button class="btn btno btnsm" onclick="closeModal('mo-edit-vote')">취소</button>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -1496,12 +1551,23 @@ function renderAdminRules() {
 function renderAdminExtraVotes() {
   var evs = (S.extraVotes||[]).filter(function(e){ return e.active; });
   setHTML('ev-list', evs.length ? evs.map(function(e){
-    return '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--c1);border-radius:8px;padding:8px 10px;margin-bottom:6px">' +
-      '<div><div style="font-size:13px;font-weight:700">'+e.title+'</div>' +
-      '<div style="font-size:11px;color:var(--mut)">'+e.date+' '+(e.stime||'')+'~'+(e.etime||'')+'</div></div>' +
-      '<button onclick="closeExtraVote(\''+e.id+'\')" style="background:var(--red);color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer">마감</button>' +
+    var typeLabel = e.matchType==='match'
+      ? '<span style="font-size:10px;color:var(--blu);font-weight:700">⚔️ 매치'+(e.opponent?' vs '+e.opponent:'')+'</span>'
+      : '<span style="font-size:10px;color:var(--g);font-weight:700">🤼 자체전</span>';
+    return '<div style="background:var(--c1);border-radius:8px;padding:8px 10px;margin-bottom:6px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
+        '<div style="flex:1">' +
+          '<div style="font-size:13px;font-weight:700;margin-bottom:2px">'+e.title+'</div>' +
+          typeLabel +
+          '<div style="font-size:11px;color:var(--mut);margin-top:2px">'+e.date+(e.stime?' '+e.stime+'~'+e.etime:'')+'</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:6px;flex-shrink:0;margin-left:8px">' +
+          '<button onclick="openEditVote(\''+e.id+'\')" style="background:var(--g);color:#000;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">수정</button>' +
+          '<button onclick="closeExtraVote(\''+e.id+'\')" style="background:var(--red);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer">마감</button>' +
+        '</div>' +
+      '</div>' +
     '</div>';
-  }).join('') : '');
+  }).join('') : '<div style="font-size:12px;color:var(--mut);text-align:center;padding:8px 0">생성된 투표 없음</div>');
 }
 
 // ── ADMIN ACTIONS ──
@@ -1684,6 +1750,74 @@ function createExtraVote() {
   evType = 'self'; setEvType('self');
   saveState(); renderVote(); renderAdmin(); renderHome();
   showToast('🗓️ 투표 생성됐습니다!');
+}
+
+// ── 투표 수정 ──
+var meType = 'self';
+
+function setMeType(type) {
+  meType = type;
+  var selfBtn = el('me-type-self');
+  var matchBtn = el('me-type-match');
+  var oppWrap = el('me-opponent-wrap');
+  if (type === 'match') {
+    selfBtn.style.borderColor = 'var(--brd)'; selfBtn.style.background = 'transparent'; selfBtn.style.color = 'var(--mut)';
+    matchBtn.style.borderColor = 'var(--g)'; matchBtn.style.background = 'rgba(255,109,0,.15)'; matchBtn.style.color = 'var(--g)';
+    if (oppWrap) oppWrap.style.display = 'block';
+  } else {
+    matchBtn.style.borderColor = 'var(--brd)'; matchBtn.style.background = 'transparent'; matchBtn.style.color = 'var(--mut)';
+    selfBtn.style.borderColor = 'var(--g)'; selfBtn.style.background = 'rgba(255,109,0,.15)'; selfBtn.style.color = 'var(--g)';
+    if (oppWrap) oppWrap.style.display = 'none';
+  }
+}
+
+function openEditVote(id) {
+  var ev = (S.extraVotes||[]).filter(function(e){ return e.id===id; })[0];
+  if (!ev) return;
+  var f = function(i,v){ var e=el(i); if(e) e.value=v||''; };
+  f('me-id', ev.id);
+  f('me-title', ev.title);
+  f('me-date', ev.date);
+  f('me-stime', ev.stime);
+  f('me-etime', ev.etime);
+  f('me-addr', ev.addr);
+  f('me-dl-date', ev.deadlineDate);
+  f('me-dl-time', ev.deadlineTime);
+  f('me-opponent', ev.opponent);
+  meType = ev.matchType || 'self';
+  setMeType(meType);
+  var mo = el('mo-edit-vote'); if (mo) mo.classList.add('op');
+}
+
+function saveEditVote() {
+  var id = (el('me-id')||{}).value;
+  var ev = (S.extraVotes||[]).filter(function(e){ return e.id===id; })[0];
+  if (!ev) return;
+  var title = (el('me-title')||{}).value.trim();
+  var date  = (el('me-date')||{}).value;
+  var dlDate = (el('me-dl-date')||{}).value;
+  if (!title||!date||!dlDate) { showToast('제목, 날짜, 마감일을 입력하세요'); return; }
+  ev.title       = title;
+  ev.matchType   = meType;
+  ev.opponent    = meType==='match' ? (el('me-opponent')||{}).value.trim() : '';
+  ev.date        = date;
+  ev.stime       = (el('me-stime')||{}).value;
+  ev.etime       = (el('me-etime')||{}).value;
+  ev.addr        = (el('me-addr')||{}).value.trim();
+  ev.deadlineDate = dlDate;
+  ev.deadlineTime = (el('me-dl-time')||{}).value;
+  saveState(); renderVote(); renderAdmin(); renderHome();
+  closeModal('mo-edit-vote');
+  showToast('✅ 투표가 수정됐습니다!');
+}
+
+function deleteVote() {
+  var id = (el('me-id')||{}).value;
+  if (!confirm('투표를 완전히 삭제할까요?\n투표 결과도 모두 사라집니다.')) return;
+  S.extraVotes = (S.extraVotes||[]).filter(function(e){ return e.id!==id; });
+  saveState(); renderVote(); renderAdmin(); renderHome();
+  closeModal('mo-edit-vote');
+  showToast('🗑️ 투표가 삭제됐습니다');
 }
 
 function closeExtraVote(id) {
