@@ -193,10 +193,7 @@ textarea{resize:vertical;min-height:80px}
       <div style="font-family:'Noto Sans KR';font-weight:700;font-size:13px;color:var(--mut)">📍 구장 날씨</div>
       <div style="font-size:10px;color:var(--mut)" id="h-weather-updated"></div>
     </div>
-    <div class="weather-loc">
-      <span id="h-weather-locname">위치 미설정</span>
-      <button class="weather-loc-edit" onclick="openLocModal()">✏️ 위치 변경</button>
-    </div>
+    <div style="font-size:12px;color:var(--mut);margin-bottom:8px" id="h-weather-locname">위치 미설정</div>
     <div id="h-weather-now" style="text-align:center;padding:8px 0;color:var(--mut);font-size:13px">날씨 불러오는 중...</div>
     <div id="h-weather-game" style="display:none"></div>
   </div>
@@ -308,28 +305,6 @@ textarea{resize:vertical;min-height:80px}
   </div>
   <div id="admin-panel" style="display:none">
 
-    <!-- 구장 위치 설정 -->
-    <div class="asec">
-      <div class="at">📍 구장 위치 설정</div>
-      <div style="font-size:12px;color:var(--mut);margin-bottom:8px">경기마다 구장 위치를 업데이트하면 날씨가 자동으로 변경돼요</div>
-      <input type="text" id="a-loc-name" placeholder="구장 이름 (예: 항동 풋살파크)">
-      <div class="two">
-        <div>
-          <div style="font-size:12px;color:var(--mut);margin-bottom:4px">위도 (Latitude)</div>
-          <input type="number" id="a-loc-lat" placeholder="37.5665" step="0.0001" style="margin-bottom:0">
-        </div>
-        <div>
-          <div style="font-size:12px;color:var(--mut);margin-bottom:4px">경도 (Longitude)</div>
-          <input type="number" id="a-loc-lng" placeholder="126.9780" step="0.0001" style="margin-bottom:0">
-        </div>
-      </div>
-      <div style="height:8px"></div>
-      <button class="btn btng btnsm" onclick="saveLocation()">📍 위치 저장</button>
-      <div style="font-size:11px;color:var(--mut);margin-top:6px;text-align:center">
-        좌표 확인: <a href="https://maps.google.com" target="_blank" style="color:var(--g)">Google Maps</a>에서 위치 우클릭 → 좌표 복사
-      </div>
-    </div>
-
     <!-- 참석자 등록 + MOM 오픈 -->
     <div class="asec">
       <div class="at">🏆 오늘 참석자 등록 & MOM 오픈</div>
@@ -340,9 +315,9 @@ textarea{resize:vertical;min-height:80px}
       <button class="btn btng" onclick="saveAttendees()">참석자 저장 + MOM 투표 열기 🏆</button>
     </div>
 
-    <!-- 추가운동 투표 생성 -->
+    <!-- 운동 투표 생성 -->
     <div class="asec">
-      <div class="at">🗓️ 추가 운동 투표 생성</div>
+      <div class="at">🗓️ 운동 투표 생성</div>
       <input type="text" id="ev-title" placeholder="투표 제목 (예: 토요일 번개운동)">
       <div style="font-size:12px;color:var(--mut);margin-bottom:4px">운동 날짜</div>
       <input type="date" id="ev-date">
@@ -357,6 +332,19 @@ textarea{resize:vertical;min-height:80px}
         </div>
       </div>
       <div style="height:8px"></div>
+      <div style="font-size:12px;color:var(--mut);margin-bottom:4px">📍 구장 이름 <span style="color:var(--mut);font-weight:400">(선택)</span></div>
+      <input type="text" id="ev-loc-name" placeholder="예: 항동 풋살파크">
+      <div class="two">
+        <div>
+          <div style="font-size:12px;color:var(--mut);margin-bottom:4px">위도</div>
+          <input type="number" id="ev-loc-lat" placeholder="37.5665" step="0.0001" style="margin-bottom:0">
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--mut);margin-bottom:4px">경도</div>
+          <input type="number" id="ev-loc-lng" placeholder="126.9780" step="0.0001" style="margin-bottom:0">
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--mut);margin-bottom:8px">💡 <a href="https://maps.google.com" target="_blank" style="color:var(--g)">Google Maps</a>에서 구장 우클릭 → 좌표 복사</div>
       <div style="font-size:12px;color:var(--mut);margin-bottom:4px">투표 마감</div>
       <div class="two">
         <input type="date" id="ev-dl-date" style="margin-bottom:0">
@@ -427,12 +415,7 @@ textarea{resize:vertical;min-height:80px}
       <button onclick="saveRules()" class="btn btng btnsm">💾 저장하기</button>
     </div>
 
-    <!-- 투표 초기화 -->
-    <div class="asec">
-      <div class="at">⚠️ 정기운동 투표 초기화</div>
-      <div style="font-size:12px;color:var(--mut);margin-bottom:10px">매주 운동 후 초기화하세요</div>
-      <button class="btn btnr btnsm" onclick="resetVotes()">🔄 정기운동 투표 초기화</button>
-    </div>
+
 
     <!-- 비밀번호 변경 -->
     <div class="asec">
@@ -835,52 +818,32 @@ function renderHome() {
   }).sort(function(a,b){
     return new Date(a.date+'T'+(a.stime||'10:00')) - new Date(b.date+'T'+(b.stime||'10:00'));
   });
-  var sun = nextSunday(); sun.setHours(10,0,0,0);
-  var sunEnd = new Date(sun); sunEnd.setHours(12,0,0,0);
-  var sundayActive = sunEnd > now;
   var banner = el('h-next-banner');
   if (!banner) return;
 
   if (extras.length) {
     var e = extras[0];
-    var eStart = new Date(e.date+'T'+(e.stime||'10:00'));
-    if (!sundayActive || eStart <= sun) {
-      var dl = new Date(e.deadlineDate+'T'+e.deadlineTime);
-      var dlPast = now > dl;
-      banner.innerHTML =
-        '<div onclick="go(\'vote\')" style="cursor:pointer">' +
-        '<div class="mbanner" style="border-color:rgba(255,214,0,.5);background:linear-gradient(135deg,#1A1200,#060806)">' +
-          '<div class="md" style="color:var(--yel)">📢 추가 운동</div>' +
-          '<div class="mt">'+e.title+'</div>' +
-          '<div style="font-size:13px;color:var(--txt);margin-top:6px">🗓️ '+e.date+'</div>' +
-          '<div style="font-size:13px;color:var(--txt)">⏰ '+e.stime+' ~ '+e.etime+'</div>' +
-          '<div style="margin-top:8px"><span class="dchip'+(dlPast?' past':'')+'">'+( dlPast?'투표 마감':'마감까지 '+deadlineDiffStr(dl))+'</span></div>' +
-          '<div style="margin-top:10px;font-size:12px;color:var(--yel);font-weight:700">👆 탭하면 투표창으로 →</div>' +
-        '</div></div>';
-      return;
-    }
-  }
-
-  if (sundayActive) {
-    var sunStr = (sun.getMonth()+1)+'월 '+sun.getDate()+'일 (일)';
-    var fri = nextFriday(); fri.setHours(19,0,0,0);
-    var friPast = now > fri;
+    var dl = new Date(e.deadlineDate+'T'+e.deadlineTime);
+    var dlPast = now > dl;
     banner.innerHTML =
       '<div onclick="go(\'vote\')" style="cursor:pointer">' +
-      '<div class="mbanner">' +
-        '<div class="md">다음 정기 운동</div>' +
-        '<div class="mt">'+sunStr+' ⚽</div>' +
-        '<div style="font-size:13px;color:var(--txt);margin-top:6px">⏰ 10:00 ~ 12:00</div>' +
-        '<div style="margin-top:8px"><span class="dchip'+(friPast?' past':'')+'">'+( friPast?'투표 마감':'마감까지 '+deadlineDiffStr(fri))+'</span></div>' +
+      '<div class="mbanner" style="border-color:rgba(255,109,0,.4)">' +
+        '<div class="md" style="color:var(--g)">다음 운동</div>' +
+        '<div class="mt">'+e.title+'</div>' +
+        '<div style="font-size:13px;color:var(--txt);margin-top:6px">🗓️ '+e.date+'</div>' +
+        (e.stime ? '<div style="font-size:13px;color:var(--txt)">⏰ '+e.stime+' ~ '+e.etime+'</div>' : '') +
+        '<div style="margin-top:8px"><span class="dchip'+(dlPast?' past':'')+'">'+( dlPast?'투표 마감':'마감까지 '+deadlineDiffStr(dl))+'</span></div>' +
         '<div style="margin-top:10px;font-size:12px;color:var(--g);font-weight:700">👆 탭하면 투표창으로 →</div>' +
       '</div></div>';
-  } else {
+    return;
+  }
+
+  else {
     banner.innerHTML =
       '<div class="mbanner">' +
-        '<div class="md">다음 정기 운동</div>' +
-        '<div class="mt">'+(nextSunday().getMonth()+1)+'월 '+nextSunday().getDate()+'일 (일) ⚽</div>' +
-        '<div style="font-size:13px;color:var(--txt);margin-top:6px">⏰ 10:00 ~ 12:00</div>' +
-        '<div style="font-size:12px;color:var(--mut);margin-top:6px">다음 주 일정</div>' +
+        '<div class="md">다음 운동</div>' +
+        '<div class="mt" style="font-size:16px;color:var(--mut)">예정된 운동이 없습니다</div>' +
+        '<div style="font-size:12px;color:var(--mut);margin-top:6px">관리자가 운동 일정을 등록하면 표시됩니다 📋</div>' +
       '</div>';
   }
 }
@@ -943,38 +906,27 @@ function renderVote() {
   var vav = el('v-all-votes');
   if (!vav) return;
   var now = new Date();
-  var sun = nextSunday(); sun.setHours(10,0,0,0);
-  var sunEnd = nextSunday(); sunEnd.setHours(12,0,0,0);
-  var sunEnded = now > sunEnd;
-  var extras = (S.extraVotes||[]).filter(function(e){ return e.active && e.date; });
-  var currentExtras = extras.filter(function(e){ return now <= new Date(e.date+'T'+(e.etime||'12:00')); });
+  var currentExtras = (S.extraVotes||[]).filter(function(e){
+    return e.active && e.date && now <= new Date(e.date+'T'+(e.etime||'23:59'));
+  }).sort(function(a,b){ return new Date(a.date+'T'+(a.stime||'00:00')) - new Date(b.date+'T'+(b.stime||'00:00')); });
   var pastExtras = (S.extraVotes||[]).filter(function(e){
     if (!e.date) return false;
-    return now > new Date(e.date+'T'+(e.etime||'12:00'));
-  }).sort(function(a,b){ return new Date(b.date+'T'+(b.stime||'10:00')) - new Date(a.date+'T'+(a.stime||'10:00')); });
-
-  var currentItems = [];
-  currentExtras.forEach(function(e){ currentItems.push({ type:'extra', ev:e, date:new Date(e.date+'T'+(e.stime||'10:00')) }); });
-  if (!sunEnded) currentItems.push({ type:'sunday', date:sun });
-  currentItems.sort(function(a,b){ return a.date - b.date; });
+    return now > new Date(e.date+'T'+(e.etime||'23:59'));
+  }).sort(function(a,b){ return new Date(b.date+'T'+(b.stime||'00:00')) - new Date(a.date+'T'+(a.stime||'00:00')); });
 
   var out = '';
-  if (currentItems.length) {
-    currentItems.forEach(function(item){
-      if (item.type==='sunday') out += renderSundayVoteCard();
-      else out += renderExtraVoteCard(item.ev);
-    });
+  if (currentExtras.length) {
+    currentExtras.forEach(function(e){ out += renderExtraVoteCard(e); });
   } else {
-    out = '<div style="color:var(--mut);font-size:13px;text-align:center;padding:30px 0">현재 진행 중인 투표가 없습니다</div>';
+    out = '<div style="color:var(--mut);font-size:13px;text-align:center;padding:30px 0">현재 진행 중인 투표가 없습니다<br><span style="font-size:11px">관리자가 운동 일정을 등록하면 표시됩니다</span></div>';
   }
   vav.innerHTML = out;
 
   var pastSection = el('v-past-section');
-  var hasPast = sunEnded || pastExtras.length > 0;
-  if (pastSection) pastSection.style.display = hasPast ? 'block' : 'none';
+  if (pastSection) pastSection.style.display = pastExtras.length > 0 ? 'block' : 'none';
 
   var pastList = el('v-past-list');
-  if (pastList && pastList.style.display !== 'none') renderPastVotes(sunEnded, pastExtras);
+  if (pastList && pastList.style.display !== 'none') renderPastVotes(pastExtras);
 }
 
 function renderSundayVoteCard(isPast) {
@@ -1017,7 +969,7 @@ function renderExtraVoteCard(e, isPast) {
   var thread = (e.comments && e.comments['_thread']) ? e.comments['_thread'] : [];
 
   return '<div class="vcard" style="border-color:rgba(255,214,0,.35)">' +
-    '<div style="font-size:10px;color:var(--yel);margin-bottom:6px">📢 추가 운동 투표</div>' +
+    '<div style="font-size:10px;color:var(--g);margin-bottom:6px">⚽ 운동 투표</div>' +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">' +
       '<div><div style="font-weight:700;font-size:16px">'+e.title+'</div>' +
       '<div style="font-size:11px;color:var(--mut)">🗓️ '+e.date+' '+(e.stime||'')+'~'+(e.etime||'')+'</div></div>' +
@@ -1078,14 +1030,11 @@ function togglePastVotes() {
     list.style.display = 'block';
     if (arrow) arrow.textContent = '▲';
     if (btn) btn.style.color = 'var(--txt)';
-    var now = new Date();
-    var sunEnd = nextSunday(); sunEnd.setHours(12,0,0,0);
-    var sunEnded = now > sunEnd;
     var pastExtras = (S.extraVotes||[]).filter(function(e){
       if (!e.date) return false;
-      return now > new Date(e.date+'T'+(e.etime||'12:00'));
-    }).sort(function(a,b){ return new Date(b.date+'T'+(b.stime||'10:00')) - new Date(a.date+'T'+(a.stime||'10:00')); });
-    renderPastVotes(sunEnded, pastExtras);
+      return now > new Date(e.date+'T'+(e.etime||'23:59'));
+    }).sort(function(a,b){ return new Date(b.date+'T'+(b.stime||'00:00')) - new Date(a.date+'T'+(a.stime||'00:00')); });
+    renderPastVotes(pastExtras);
   } else {
     list.style.display = 'none';
     if (arrow) arrow.textContent = '▼';
@@ -1093,11 +1042,10 @@ function togglePastVotes() {
   }
 }
 
-function renderPastVotes(sunEnded, pastExtras) {
+function renderPastVotes(pastExtras) {
   var pastList = el('v-past-list');
   if (!pastList) return;
   var out = '';
-  if (sunEnded) out += renderSundayVoteCard(true);
   pastExtras.forEach(function(e){ out += renderExtraVoteCard(e, true); });
   pastList.innerHTML = out || '<div style="color:var(--mut);font-size:13px;text-align:center;padding:16px 0">지난 투표 없음</div>';
 }
@@ -1603,16 +1551,29 @@ function parseBulkRules() {
 }
 
 function createExtraVote() {
-  var title  = (el('ev-title')||{}).value.trim();
-  var date   = (el('ev-date')||{}).value;
-  var stime  = (el('ev-stime')||{}).value;
-  var etime  = (el('ev-etime')||{}).value;
-  var dlDate = (el('ev-dl-date')||{}).value;
-  var dlTime = (el('ev-dl-time')||{}).value;
+  var title   = (el('ev-title')||{}).value.trim();
+  var date    = (el('ev-date')||{}).value;
+  var stime   = (el('ev-stime')||{}).value;
+  var etime   = (el('ev-etime')||{}).value;
+  var dlDate  = (el('ev-dl-date')||{}).value;
+  var dlTime  = (el('ev-dl-time')||{}).value;
+  var locName = (el('ev-loc-name')||{}).value.trim();
+  var locLat  = parseFloat((el('ev-loc-lat')||{}).value);
+  var locLng  = parseFloat((el('ev-loc-lng')||{}).value);
   if (!title||!date||!dlDate) { showToast('제목, 운동날짜, 마감날짜를 입력하세요'); return; }
   if (!S.extraVotes) S.extraVotes = [];
-  S.extraVotes.push({ id:'ev_'+Date.now(), title:title, date:date, stime:stime, etime:etime, deadlineDate:dlDate, deadlineTime:dlTime, active:true, votes:{}, comments:{} });
+  var evObj = { id:'ev_'+Date.now(), title:title, date:date, stime:stime, etime:etime, deadlineDate:dlDate, deadlineTime:dlTime, active:true, votes:{}, comments:{} };
+  // 구장 위치가 입력됐으면 저장 & 날씨 갱신
+  if (locLat && locLng) {
+    evObj.location = { name: locName||'구장', lat: locLat, lng: locLng };
+    S.location = { name: locName||'구장', lat: locLat, lng: locLng };
+    setTimeout(refreshWeather, 300);
+  }
+  S.extraVotes.push(evObj);
   el('ev-title').value=''; el('ev-date').value=''; el('ev-dl-date').value='';
+  if(el('ev-loc-name')) el('ev-loc-name').value='';
+  if(el('ev-loc-lat')) el('ev-loc-lat').value='';
+  if(el('ev-loc-lng')) el('ev-loc-lng').value='';
   saveState(); renderVote(); renderAdmin(); renderHome();
   showToast('🗓️ 투표 생성됐습니다!');
 }
