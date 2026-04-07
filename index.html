@@ -729,8 +729,9 @@ function init() {
 // ── WEATHER ──
 function getWeatherLabel(code) { return WMO_CODE[code] || '🌡️ 알수없음'; }
 
+var KAKAO_KEY = 'ceb0c3de3b70ca121bd9e1850c5fc553';
+
 function refreshWeather() {
-  // 가장 가까운 예정 운동 찾기
   var now = new Date();
   var upcoming = (S.extraVotes||[]).filter(function(e){
     return e.active && e.date && new Date(e.date+'T'+(e.etime||'23:59')) > now;
@@ -738,9 +739,9 @@ function refreshWeather() {
     return new Date(a.date+'T'+(a.stime||'00:00')) - new Date(b.date+'T'+(b.stime||'00:00'));
   });
 
-  var gameEl   = el('h-weather-game');
-  var locEl    = el('h-weather-locname');
-  var updEl    = el('h-weather-updated');
+  var gameEl = el('h-weather-game');
+  var locEl  = el('h-weather-locname');
+  var updEl  = el('h-weather-updated');
 
   if (!upcoming.length) {
     if (locEl) locEl.textContent = '';
@@ -751,43 +752,52 @@ function refreshWeather() {
 
   var ev = upcoming[0];
   var gameDate = ev.date;
-  var addr = ev.addr || '';
-  var locName = addr || '주소 미입력';
-  if (locEl) locEl.textContent = addr ? '📍 '+addr : '';
+  var addr = (ev.addr || '').trim();
 
-  // 주소가 없으면 안내
   if (!addr) {
+    if (locEl) locEl.textContent = '';
     if (gameEl) gameEl.innerHTML =
       '<div style="text-align:center;padding:12px 0;color:var(--mut);font-size:12px">' +
-      '운동 투표에 구장 주소를 입력하면<br>날씨 예보가 표시됩니다</div>';
+      '운동 투표에 구장 주소를 입력하면<br>날씨 예보가 표시됩니다 ⛅</div>';
     return;
   }
 
+  if (locEl) locEl.textContent = '📍 ' + addr;
   if (gameEl) gameEl.innerHTML =
     '<div style="text-align:center;padding:10px 0;color:var(--mut);font-size:12px">날씨 불러오는 중...</div>';
 
-  // Open-Meteo Geocoding API로 주소 → 좌표 변환
-  var geoUrl = 'https://geocoding-api.open-meteo.com/v1/search?name=' +
-    encodeURIComponent(addr) + '&count=1&language=ko&format=json';
-
-  fetch(geoUrl).then(function(r){ return r.json(); }).then(function(geo){
-    var results = geo && geo.results;
-    if (!results || !results.length) throw new Error('주소를 찾을 수 없습니다');
-    var lat = results[0].latitude;
-    var lng = results[0].longitude;
-    var placeName = results[0].name || addr;
-    if (locEl) locEl.textContent = '📍 '+placeName;
-    loadGameWeather(lat, lng, gameDate, ev, updEl);
-  }).catch(function(err){
-    // Geocoding 실패 시 저장된 좌표 사용
-    var loc = S.location || {};
-    if (loc.lat && loc.lng) {
-      loadGameWeather(loc.lat, loc.lng, gameDate, ev, updEl);
+  // 카카오 주소 검색 API → 좌표 변환
+  fetch('https://dapi.kakao.com/v2/local/search/keyword.json?query=' + encodeURIComponent(addr) + '&size=1', {
+    headers: { 'Authorization': 'KakaoAK ' + KAKAO_KEY }
+  }).then(function(r){ return r.json(); })
+  .then(function(data){
+    var docs = data && data.documents;
+    if (docs && docs.length) {
+      var lat = parseFloat(docs[0].y);
+      var lng = parseFloat(docs[0].x);
+      var placeName = docs[0].place_name || addr;
+      if (locEl) locEl.textContent = '📍 ' + placeName;
+      loadGameWeather(lat, lng, gameDate, ev, updEl);
     } else {
-      if (gameEl) gameEl.innerHTML =
-        '<div style="text-align:center;padding:10px 0;color:var(--mut);font-size:12px">' +
-        '주소로 위치를 찾지 못했어요<br><span style="font-size:11px">더 자세한 주소를 입력해보세요</span></div>';
+      // 키워드 검색 실패 → 주소 검색으로 재시도
+      return fetch('https://dapi.kakao.com/v2/local/search/address.json?query=' + encodeURIComponent(addr), {
+        headers: { 'Authorization': 'KakaoAK ' + KAKAO_KEY }
+      }).then(function(r){ return r.json(); }).then(function(data2){
+        var docs2 = data2 && data2.documents;
+        if (docs2 && docs2.length) {
+          var lat2 = parseFloat(docs2[0].y);
+          var lng2 = parseFloat(docs2[0].x);
+          loadGameWeather(lat2, lng2, gameDate, ev, updEl);
+        } else {
+          throw new Error('주소 없음');
+        }
+      });
     }
+  }).catch(function(){
+    if (gameEl) gameEl.innerHTML =
+      '<div style="text-align:center;padding:12px 0;color:var(--mut);font-size:12px">' +
+      '주소로 위치를 찾지 못했어요 😥<br>' +
+      '<span style="font-size:11px">예: 서울 구로구 신도림동 271-64</span></div>';
   });
 }
 
