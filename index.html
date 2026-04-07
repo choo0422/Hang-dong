@@ -766,39 +766,57 @@ function refreshWeather() {
   if (gameEl) gameEl.innerHTML =
     '<div style="text-align:center;padding:10px 0;color:var(--mut);font-size:12px">날씨 불러오는 중...</div>';
 
-  // 카카오 주소 검색 API → 좌표 변환
-  fetch('https://dapi.kakao.com/v2/local/search/keyword.json?query=' + encodeURIComponent(addr) + '&size=1', {
-    headers: { 'Authorization': 'KakaoAK ' + KAKAO_KEY }
-  }).then(function(r){ return r.json(); })
-  .then(function(data){
-    var docs = data && data.documents;
-    if (docs && docs.length) {
-      var lat = parseFloat(docs[0].y);
-      var lng = parseFloat(docs[0].x);
-      var placeName = docs[0].place_name || addr;
-      if (locEl) locEl.textContent = '📍 ' + placeName;
-      loadGameWeather(lat, lng, gameDate, ev, updEl);
-    } else {
-      // 키워드 검색 실패 → 주소 검색으로 재시도
-      return fetch('https://dapi.kakao.com/v2/local/search/address.json?query=' + encodeURIComponent(addr), {
-        headers: { 'Authorization': 'KakaoAK ' + KAKAO_KEY }
-      }).then(function(r){ return r.json(); }).then(function(data2){
-        var docs2 = data2 && data2.documents;
-        if (docs2 && docs2.length) {
-          var lat2 = parseFloat(docs2[0].y);
-          var lng2 = parseFloat(docs2[0].x);
-          loadGameWeather(lat2, lng2, gameDate, ev, updEl);
-        } else {
-          throw new Error('주소 없음');
-        }
+  // 카카오 키워드 검색 → CORS 프록시 경유
+  var kakaoUrl = 'https://dapi.kakao.com/v2/local/search/keyword.json?query=' + encodeURIComponent(addr) + '&size=1';
+  var proxyUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent(kakaoUrl + '|kakao|' + KAKAO_KEY);
+
+  // 프록시 없이 직접 먼저 시도
+  fetch(kakaoUrl, { headers: { 'Authorization': 'KakaoAK ' + KAKAO_KEY } })
+  .then(function(r){
+    if (!r.ok) throw new Error('cors');
+    return r.json();
+  })
+  .then(function(data){ return handleKakaoResult(data, addr, gameDate, ev, updEl, locEl, gameEl); })
+  .catch(function(){
+    // 직접 호출 실패 시 → 주소 검색으로 재시도
+    var addrUrl = 'https://dapi.kakao.com/v2/local/search/address.json?query=' + encodeURIComponent(addr);
+    fetch(addrUrl, { headers: { 'Authorization': 'KakaoAK ' + KAKAO_KEY } })
+    .then(function(r){ return r.json(); })
+    .then(function(data2){ return handleKakaoResult(data2, addr, gameDate, ev, updEl, locEl, gameEl); })
+    .catch(function(){
+      // 둘 다 실패 → nominatim(OpenStreetMap) 무료 geocoding으로 최종 시도
+      fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(addr) + '&format=json&limit=1&accept-language=ko', {
+        headers: { 'User-Agent': 'HangdongFC-App' }
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        if (res && res.length) {
+          var lat = parseFloat(res[0].lat);
+          var lng = parseFloat(res[0].lon);
+          loadGameWeather(lat, lng, gameDate, ev, updEl);
+        } else { throw new Error('not found'); }
+      })
+      .catch(function(){
+        if (gameEl) gameEl.innerHTML =
+          '<div style="text-align:center;padding:12px 0;color:var(--mut);font-size:12px">' +
+          '주소로 위치를 찾지 못했어요 😥<br>' +
+          '<span style="font-size:11px">더 자세한 주소를 입력해보세요<br>예: 서울 구로구 신도림동 271-64</span></div>';
       });
-    }
-  }).catch(function(){
-    if (gameEl) gameEl.innerHTML =
-      '<div style="text-align:center;padding:12px 0;color:var(--mut);font-size:12px">' +
-      '주소로 위치를 찾지 못했어요 😥<br>' +
-      '<span style="font-size:11px">예: 서울 구로구 신도림동 271-64</span></div>';
+    });
   });
+}
+
+function handleKakaoResult(data, addr, gameDate, ev, updEl, locEl, gameEl) {
+  var docs = data && data.documents;
+  if (docs && docs.length) {
+    var lat = parseFloat(docs[0].y);
+    var lng = parseFloat(docs[0].x);
+    var placeName = docs[0].place_name || docs[0].address_name || addr;
+    if (locEl) locEl.textContent = '📍 ' + placeName;
+    loadGameWeather(lat, lng, gameDate, ev, updEl);
+  } else {
+    throw new Error('no result');
+  }
 }
 
 function loadGameWeather(lat, lng, gameDate, ev, updEl) {
