@@ -253,27 +253,12 @@ textarea{resize:vertical;min-height:80px}
   <div class="dcard">
     <div style="font-size:12px;color:var(--mut)">월 회비</div>
     <div class="dam" id="dues-amount-disp">30,000원</div>
-    <div style="font-size:11px;color:var(--mut)" id="dues-month-label"></div>
   </div>
   <!-- 입금 계좌 -->
   <div class="card" id="dues-account-card">
     <div class="ct">입금 계좌</div>
     <div id="dues-account-info">
       <div style="color:var(--mut);font-size:13px;text-align:center;padding:10px 0">관리자가 계좌 정보를 등록하면 표시됩니다</div>
-    </div>
-  </div>
-  <!-- 납부 현황 -->
-  <div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div class="ct" style="margin-bottom:0">이번 달 납부 현황</div>
-      <div style="display:flex;align-items:center;gap:6px">
-        <button onclick="changeDuesMonth(-1)" class="month-btn">◀</button>
-        <span class="month-label" id="dues-view-month"></span>
-        <button onclick="changeDuesMonth(1)" class="month-btn">▶</button>
-      </div>
-    </div>
-    <div id="dues-status-view">
-      <div style="color:var(--mut);font-size:13px;text-align:center;padding:10px 0">회원을 먼저 등록하세요</div>
     </div>
   </div>
 </div>
@@ -1506,13 +1491,9 @@ function checkMomExpiry() {
 
 // ── DUES ──
 function renderDues() {
-  // 금액 표시
   var amt = S.duesAmount || 30000;
   var amtEl = el('dues-amount-disp');
   if (amtEl) amtEl.textContent = amt.toLocaleString()+'원';
-  // 조회 월 레이블
-  var viewEl = el('dues-view-month');
-  if (viewEl) viewEl.textContent = ymLabel(duesViewMonth);
   // 계좌 정보
   var bi = S.bankInfo || {};
   var acEl = el('dues-account-info');
@@ -1524,14 +1505,25 @@ function renderDues() {
         '<div>예금주: <strong style="color:var(--txt)">'+bi.holder+'</strong></div>' +
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">' +
           '<span class="bnum">'+bi.num+'</span>' +
-          '<button class="cbtn" onclick="copyText(\''+bi.num+'\')">📋 복사</button>' +
-        '</div></div>';
+        '</div></div>' +
+        '<button class="btn btng btnsm" style="margin-top:10px" onclick="copyBankAll()">📋 계좌 정보 한번에 복사</button>';
     } else {
       acEl.innerHTML = '<div style="color:var(--mut);font-size:13px;text-align:center;padding:10px 0">관리자가 계좌 정보를 등록하면 표시됩니다</div>';
     }
   }
-  // 납부 현황
-  renderDuesStatus();
+}
+
+function copyBankAll() {
+  var bi = S.bankInfo || {};
+  var text = bi.bank + ' ' + bi.num + ' (' + bi.holder + ')';
+  navigator.clipboard.writeText(text).then(function(){
+    showToast('📋 계좌 정보 복사됐습니다!');
+  }).catch(function(){
+    var e2 = document.createElement('textarea');
+    e2.value = text; document.body.appendChild(e2); e2.select();
+    document.execCommand('copy'); document.body.removeChild(e2);
+    showToast('📋 계좌 정보 복사됐습니다!');
+  });
 }
 
 function renderDuesStatus() {
@@ -1729,7 +1721,11 @@ function addMember() {
   var name = (el('a-new-member')||{}).value.trim();
   if (!name) return;
   if (!S.members) S.members = [];
-  if (S.members.indexOf(name)===-1) { S.members.push(name); saveState(); renderAdmin(); renderDues(); }
+  if (S.members.indexOf(name)===-1) {
+    S.members.push(name);
+    S.members.sort(function(a, b){ return a.localeCompare(b, 'ko'); });
+    saveState(); renderAdmin(); renderDues();
+  }
   el('a-new-member').value = '';
 }
 
