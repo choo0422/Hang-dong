@@ -519,6 +519,22 @@ textarea{resize:vertical;min-height:80px}
   </div>
 </div>
 
+<!-- DUES ACTION MODAL -->
+<div class="mo" id="mo-dues">
+  <div class="mbox">
+    <h3 id="mo-dues-name" style="margin-bottom:16px"></h3>
+    <button onclick="duesAction('pay')"
+      style="width:100%;padding:13px;border-radius:10px;border:1px solid rgba(0,200,83,.4);background:rgba(0,200,83,.08);color:#00C853;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR';margin-bottom:10px">
+      ✅ 납부 완료 처리
+    </button>
+    <button onclick="duesAction('annual')"
+      style="width:100%;padding:13px;border-radius:10px;border:1px solid rgba(255,214,0,.4);background:rgba(255,214,0,.08);color:var(--yel);font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR';margin-bottom:10px">
+      🏅 연회비 회원으로 전환
+    </button>
+    <button class="btn btno btnsm" onclick="closeModal('mo-dues')">취소</button>
+  </div>
+</div>
+
 <!-- ROLE MODAL -->
 <div class="mo" id="mo-role">
   <div class="mbox" style="max-height:88vh;overflow-y:auto">
@@ -1875,30 +1891,46 @@ function togAnnual(name) {
 function renderAdminDues() {
   var paid   = (S.duesPaid && S.duesPaid[duesAdminMonth]) ? S.duesPaid[duesAdminMonth] : [];
   var annual = S.annualMembers || [];
-  var monthly = (S.members||[]).filter(function(n){ return annual.indexOf(n) === -1; });
+  var leave  = S.memberLeave || {};
+  // 월회비 = 연회비 아니고 + 휴회중 아닌 회원
+  var monthly = (S.members||[]).filter(function(n){
+    return annual.indexOf(n) === -1 && !leave[n];
+  });
+  // 휴회중인 회원
+  var onLeave = (S.members||[]).filter(function(n){ return !!leave[n]; });
 
   var html = '';
 
   // 월회비 회원
   if (monthly.length) {
-    html += '<div style="font-size:11px;color:var(--mut);font-weight:700;margin-bottom:6px">💰 월회비 회원</div>';
+    html += '<div style="font-size:11px;color:var(--mut);font-weight:700;margin-bottom:6px">💰 월회비 회원 <span style="font-weight:400">(탭 → 납부/연회비 선택)</span></div>';
     html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">' +
       monthly.map(function(n){
         var isPaid = paid.indexOf(n) !== -1;
-        return '<div onclick="togDues(\''+n+'\')" style="padding:6px 12px;border-radius:20px;font-size:13px;cursor:pointer;' +
+        return '<div onclick="openDuesModal(\''+n+'\')" style="padding:6px 12px;border-radius:20px;font-size:13px;cursor:pointer;' +
           'border:1px solid '+(isPaid?'rgba(0,200,83,.4)':'rgba(255,23,68,.35)')+';' +
           'background:'+(isPaid?'rgba(0,200,83,.1)':'rgba(255,23,68,.06)')+';' +
           'color:'+(isPaid?'#00C853':'var(--red)')+'">'+n+(isPaid?' ✓':'')+'</div>';
       }).join('') + '</div>';
   }
 
-  // 연회비 회원 (월별 납부 체크 불필요하지만 표시는 함)
+  // 연회비 회원
   if (annual.length) {
     html += '<div style="font-size:11px;color:var(--yel);font-weight:700;margin-bottom:6px">🏅 연회비 회원</div>';
-    html += '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">' +
       annual.map(function(n){
         return '<div style="padding:6px 12px;border-radius:20px;font-size:13px;' +
           'border:1px solid rgba(255,214,0,.4);background:rgba(255,214,0,.08);color:var(--yel)">'+n+' 🏅</div>';
+      }).join('') + '</div>';
+  }
+
+  // 휴회중 회원 (납부 대상 아님)
+  if (onLeave.length) {
+    html += '<div style="font-size:11px;color:#666;font-weight:700;margin-bottom:6px">⏸️ 휴회중 (납부 제외)</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
+      onLeave.map(function(n){
+        return '<div style="padding:6px 12px;border-radius:20px;font-size:13px;' +
+          'border:1px solid #444;background:rgba(255,255,255,.03);color:#555;text-decoration:line-through">'+n+'</div>';
       }).join('') + '</div>';
   }
 
@@ -2333,6 +2365,47 @@ function removeMember(name) {
   if (S.memberJoinDate) delete S.memberJoinDate[name];
   addHistory('leave', name);
   saveState(); renderAdmin(); renderDues();
+}
+
+// ── 납부 선택 모달 ──
+var _duesTargetName = '';
+
+function openDuesModal(name) {
+  _duesTargetName = name;
+  var paid = (S.duesPaid && S.duesPaid[duesAdminMonth]) ? S.duesPaid[duesAdminMonth] : [];
+  var isPaid = paid.indexOf(name) !== -1;
+  var nameEl = el('mo-dues-name');
+  if (nameEl) nameEl.textContent = name + (isPaid ? ' · 납부완료' : ' · 미납');
+  // 납부 버튼 텍스트 토글
+  var payBtn = document.querySelector('#mo-dues button:first-of-type');
+  if (payBtn) payBtn.textContent = isPaid ? '↩️ 납부 취소' : '✅ 납부 완료 처리';
+  var mo = el('mo-dues'); if (mo) mo.classList.add('op');
+}
+
+function duesAction(action) {
+  var name = _duesTargetName;
+  if (action === 'pay') {
+    // 납부 완료 / 취소 토글
+    if (!S.duesPaid) S.duesPaid = {};
+    if (!S.duesPaid[duesAdminMonth]) S.duesPaid[duesAdminMonth] = [];
+    var idx = S.duesPaid[duesAdminMonth].indexOf(name);
+    if (idx === -1) {
+      S.duesPaid[duesAdminMonth].push(name);
+      showToast('✅ ' + name + ' 납부 완료!');
+    } else {
+      S.duesPaid[duesAdminMonth].splice(idx, 1);
+      showToast('↩️ ' + name + ' 납부 취소됐습니다');
+    }
+  } else if (action === 'annual') {
+    // 연회비 전환
+    if (!S.annualMembers) S.annualMembers = [];
+    if (S.annualMembers.indexOf(name) === -1) {
+      S.annualMembers.push(name);
+      showToast('🏅 ' + name + ' 연회비 회원으로 전환됐습니다');
+    }
+  }
+  saveState(); renderAdminDues(); renderDues();
+  closeModal('mo-dues');
 }
 
 function togDues(name) {
