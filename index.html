@@ -414,6 +414,7 @@ textarea{resize:vertical;min-height:80px}
       </button>
       <div class="adm-acc-bd" id="acc-members" style="display:none">
         <div id="a-members" style="margin-bottom:10px"></div>
+        <div id="a-member-joindate-list" style="display:none;margin-bottom:10px"></div>
         <div style="display:flex;gap:8px">
           <input type="text" id="a-new-member" placeholder="이름 입력" style="margin-bottom:0;flex:1">
           <button class="btn btng btnsm" onclick="addMember()" style="flex:none;width:auto;padding:0 16px;margin-top:0">추가</button>
@@ -445,6 +446,19 @@ textarea{resize:vertical;min-height:80px}
         <div id="a-rules-list"></div>
         <button onclick="addRuleItem()" class="btn btno btnsm" style="margin-bottom:8px">+ 조항 추가</button>
         <button onclick="saveRules()" class="btn btng btnsm">💾 저장하기</button>
+      </div>
+    </div>
+
+    <!-- 📋 회원 가입/탈퇴 히스토리 -->
+    <div class="adm-acc">
+      <button class="adm-acc-hd" onclick="toggleAcc('acc-history');renderHistory()">
+        <span>📋 회원 히스토리</span><span class="adm-acc-arr" id="arr-acc-history">▼</span>
+      </button>
+      <div class="adm-acc-bd" id="acc-history" style="display:none">
+        <div style="font-size:12px;color:var(--mut);margin-bottom:8px">
+          ✅ 가입 · 🚪 탈퇴 · 🔓 기기초기화 기록
+        </div>
+        <div id="a-history-list"></div>
       </div>
     </div>
 
@@ -646,6 +660,8 @@ var DEF = {
   memberRoles: {},
   memberLeave: {},
   annualMembers: [],
+  memberJoinDate: {},
+  memberHistory: [],
   notice: { active: false, title: '', body: '' },
   location: { name:'', lat:0, lng:0 },
   settings: { adminPw: '1234' }
@@ -733,7 +749,7 @@ function syncSupabase() {
 }
 
 function ensureKeys() {
-  var keys = ['members','votes','comments','matches','momVoters','duesPaid','extraVotes','rules','deviceNames','location','bankInfo','memberRoles','memberLeave','annualMembers'];
+  var keys = ['members','votes','comments','matches','momVoters','duesPaid','extraVotes','rules','deviceNames','location','bankInfo','memberRoles','memberLeave','annualMembers','memberJoinDate','memberHistory'];
   for (var i = 0; i < keys.length; i++) {
     if (!S[keys[i]]) S[keys[i]] = cloneObj(DEF[keys[i]]);
   }
@@ -1942,50 +1958,8 @@ function renderAdmin() {
   var duesAmtIn = el('a-dues-amount'); if(duesAmtIn) duesAmtIn.value = S.duesAmount || 30000;
   var admMonthLbl = el('a-dues-month-label'); if(admMonthLbl) admMonthLbl.textContent = ymLabel(duesAdminMonth);
   renderAdminDues();
-  // 팀원 - 칩 형태로 가로 나열
-  var ROLES = ['회원','회장','부회장','감독','코치','고문','운영총무','재정총무'];
-  var ROLE_STYLE = {
-    '회원':   'color:#EFEFEF;border-color:#444;background:transparent',
-    '회장':   'color:#FFD600;border-color:#FFD600;background:rgba(255,214,0,.12)',
-    '부회장': 'color:#FFD600;border-color:#FFD600;background:rgba(255,214,0,.08)',
-    '감독':   'color:#2979FF;border-color:#2979FF;background:rgba(41,121,255,.12)',
-    '코치':   'color:#2979FF;border-color:#2979FF;background:rgba(41,121,255,.08)',
-    '고문':   'color:#00C853;border-color:#00C853;background:rgba(0,200,83,.1)',
-    '운영총무':'color:#FF6D00;border-color:#FF6D00;background:rgba(255,109,0,.12)',
-    '재정총무':'color:#FF6D00;border-color:#FF6D00;background:rgba(255,109,0,.08)'
-  };
-  // 직책 범례
-  var legend =
-    '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;padding:10px;background:var(--c1);border-radius:10px">' +
-    '<div style="font-size:11px;color:var(--mut);width:100%;margin-bottom:4px">직책 색상 안내</div>' +
-    Object.keys(ROLE_STYLE).map(function(r){
-      return '<span style="font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid;'+ROLE_STYLE[r]+'">'+r+'</span>';
-    }).join('') +
-    '<span style="font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid;color:#888;border-color:#555;background:rgba(255,255,255,.04);text-decoration:line-through">휴회</span>' +
-    '</div>';
-
-  var chips = (S.members||[]).length ?
-    '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
-    (S.members||[]).map(function(n){
-      var role = (S.memberRoles||{})[n] || '회원';
-      var leaveInfo = (S.memberLeave||{})[n]; // 휴회 정보
-      var style = leaveInfo
-        ? 'color:#666;border-color:#444;background:rgba(255,255,255,.03);text-decoration:line-through'
-        : (ROLE_STYLE[role] || ROLE_STYLE['회원']);
-      var dn = S.deviceNames || {};
-      var regDid = null;
-      Object.keys(dn).forEach(function(k){ if(dn[k]===n) regDid=k; });
-      var label = n + (leaveInfo ? '' : '');
-      return '<div onclick="openRoleModal(\''+n+'\')" style="padding:5px 12px;border-radius:20px;font-size:13px;cursor:pointer;border:1px solid;transition:.15s;position:relative;'+style+'">' +
-        label +
-        (leaveInfo ? '<span style="font-size:10px;margin-left:4px;text-decoration:none;display:inline-block;color:#666">(휴회중)</span>' : '') +
-        (regDid && !leaveInfo ? '<span style="position:absolute;top:-3px;right:-3px;width:7px;height:7px;border-radius:50%;background:var(--g);border:1px solid var(--c2)"></span>' : '') +
-      '</div>';
-    }).join('') +
-    '</div>' :
-    '<div style="color:var(--mut);font-size:13px;text-align:center;padding:8px 0">등록된 팀원 없음</div>';
-
-  setHTML('a-members', legend + chips);
+  // 팀원
+  renderMembersAdmin();
   // 이름 등록 현황
   var dn = S.deviceNames || {};
   var devKeys = Object.keys(dn);
@@ -2057,6 +2031,137 @@ function saveAttendees() {
   showToast('✅ 참석자 저장 + MOM 투표 오픈!');
 }
 
+// ── 회원 히스토리 ──
+function addHistory(type, name) {
+  if (!S.memberHistory) S.memberHistory = [];
+  var now = new Date();
+  var dateStr = now.getFullYear()+'.'
+    + String(now.getMonth()+1).padStart(2,'0')+'.'
+    + String(now.getDate()).padStart(2,'0')
+    + ' ' + String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  var labels = { join:'가입', leave:'탈퇴', reset:'기기초기화' };
+  S.memberHistory.unshift({ type:type, name:name, date:dateStr });
+  if (S.memberHistory.length > 200) S.memberHistory = S.memberHistory.slice(0,200);
+}
+
+function renderHistory() {
+  var list = el('a-history-list');
+  if (!list) return;
+  var history = S.memberHistory || [];
+  if (!history.length) {
+    list.innerHTML = '<div style="color:var(--mut);font-size:13px;text-align:center;padding:12px 0">기록 없음</div>';
+    return;
+  }
+  var ICON = { join:'✅', leave:'🚪', reset:'🔓' };
+  var COLOR = { join:'#00C853', leave:'var(--red)', reset:'var(--yel)' };
+  var LABEL = { join:'가입', leave:'탈퇴', reset:'기기초기화' };
+  list.innerHTML = history.map(function(h){
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--brd)">' +
+      '<span style="font-size:16px">'+ICON[h.type]+'</span>' +
+      '<div style="flex:1">' +
+        '<span style="font-size:13px;font-weight:700;color:'+(COLOR[h.type]||'var(--txt)')+'">'+LABEL[h.type]+'</span>' +
+        '<span style="font-size:13px;margin-left:8px">'+h.name+'</span>' +
+      '</div>' +
+      '<span style="font-size:11px;color:var(--mut);white-space:nowrap">'+h.date+'</span>' +
+    '</div>';
+  }).join('');
+}
+
+// ── 가입일자 관리 ──
+function saveJoinDate(name) {
+  var inp = el('jd-'+name.replace(/[^a-zA-Z0-9가-힣]/g,'_'));
+  if (!inp) return;
+  var val = inp.value;
+  if (!val) { showToast('날짜를 선택하세요'); return; }
+  if (!S.memberJoinDate) S.memberJoinDate = {};
+  S.memberJoinDate[name] = val;
+  saveState(); renderMembersAdmin();
+  showToast('✅ '+name+' 가입일 저장됐습니다');
+}
+
+function renderMembersAdmin() {
+  var ROLE_STYLE = {
+    '회원':   'color:#EFEFEF;border-color:#444;background:transparent',
+    '회장':   'color:#FFD600;border-color:#FFD600;background:rgba(255,214,0,.12)',
+    '부회장': 'color:#FFD600;border-color:#FFD600;background:rgba(255,214,0,.08)',
+    '감독':   'color:#2979FF;border-color:#2979FF;background:rgba(41,121,255,.12)',
+    '코치':   'color:#2979FF;border-color:#2979FF;background:rgba(41,121,255,.08)',
+    '고문':   'color:#00C853;border-color:#00C853;background:rgba(0,200,83,.1)',
+    '운영총무':'color:#FF6D00;border-color:#FF6D00;background:rgba(255,109,0,.12)',
+    '재정총무':'color:#FF6D00;border-color:#FF6D00;background:rgba(255,109,0,.08)'
+  };
+  var legend =
+    '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;padding:10px;background:var(--c1);border-radius:10px">' +
+    '<div style="font-size:11px;color:var(--mut);width:100%;margin-bottom:4px">직책 색상 안내</div>' +
+    Object.keys(ROLE_STYLE).map(function(r){
+      return '<span style="font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid;'+ROLE_STYLE[r]+'">'+r+'</span>';
+    }).join('') +
+    '<span style="font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid;color:#888;border-color:#555;background:rgba(255,255,255,.04);text-decoration:line-through">휴회</span>' +
+    '</div>';
+
+  // 정렬 버튼
+  var sortBtns =
+    '<div style="display:flex;gap:6px;margin-bottom:10px">' +
+    '<button onclick="renderMembersAdminSorted(\'name\')" style="padding:5px 12px;border-radius:20px;border:1px solid var(--brd);background:var(--c1);color:var(--txt);font-size:12px;cursor:pointer;font-family:\'Noto Sans KR\'">가나다순</button>' +
+    '<button onclick="renderMembersAdminSorted(\'date\')" style="padding:5px 12px;border-radius:20px;border:1px solid var(--g);background:rgba(255,109,0,.1);color:var(--g);font-size:12px;cursor:pointer;font-family:\'Noto Sans KR\'">가입일순</button>' +
+    '</div>';
+
+  var leave = S.memberLeave || {};
+  var chips =
+    '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
+    (S.members||[]).map(function(n){
+      var role = (S.memberRoles||{})[n] || '회원';
+      var leaveInfo = leave[n];
+      var style = leaveInfo
+        ? 'color:#666;border-color:#444;background:rgba(255,255,255,.03);text-decoration:line-through'
+        : (ROLE_STYLE[role] || ROLE_STYLE['회원']);
+      var dn = S.deviceNames || {};
+      var regDid = null;
+      Object.keys(dn).forEach(function(k){ if(dn[k]===n) regDid=k; });
+      var jd = (S.memberJoinDate||{})[n];
+      return '<div onclick="openRoleModal(\''+n+'\')" style="padding:5px 12px;border-radius:20px;font-size:13px;cursor:pointer;border:1px solid;transition:.15s;position:relative;'+style+'">' +
+        n + (leaveInfo?'<span style="font-size:10px;margin-left:4px;text-decoration:none;display:inline-block;color:#666">(휴회중)</span>':'') +
+        (jd?'<span style="font-size:9px;display:block;color:var(--mut);text-decoration:none">'+jd+'</span>':'') +
+        (regDid && !leaveInfo?'<span style="position:absolute;top:-3px;right:-3px;width:7px;height:7px;border-radius:50%;background:var(--g);border:1px solid var(--c2)"></span>':'') +
+      '</div>';
+    }).join('') + '</div>';
+
+  setHTML('a-members', legend + sortBtns + chips);
+}
+
+function renderMembersAdminSorted(by) {
+  var joinDate = S.memberJoinDate || {};
+  var sorted = (S.members||[]).slice();
+  if (by === 'date') {
+    sorted.sort(function(a,b){
+      var da = joinDate[a] || '9999-99-99';
+      var db = joinDate[b] || '9999-99-99';
+      return da < db ? -1 : da > db ? 1 : 0;
+    });
+  } else {
+    sorted.sort(function(a,b){ return a.localeCompare(b,'ko'); });
+  }
+  // 가입일순 목록 별도 표시
+  var joinDateEl = el('a-member-joindate-list');
+  if (joinDateEl) {
+    joinDateEl.style.display = by==='date' ? 'block' : 'none';
+    if (by === 'date') {
+      joinDateEl.innerHTML =
+        '<div style="font-size:12px;color:var(--mut);margin-bottom:8px;margin-top:12px">📅 가입일 순 목록 (클릭해서 날짜 수정)</div>' +
+        sorted.map(function(n, i){
+          var jd = joinDate[n];
+          var safeId = 'jd-'+n.replace(/[^a-zA-Z0-9가-힣]/g,'_');
+          return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--brd)">' +
+            '<span style="font-size:12px;color:var(--mut);min-width:24px">'+(i+1)+'위</span>' +
+            '<span style="flex:1;font-size:13px;font-weight:700">'+n+'</span>' +
+            '<input type="date" id="'+safeId+'" value="'+(jd||'')+'" style="margin-bottom:0;width:130px;font-size:12px;padding:4px 8px">' +
+            '<button onclick="saveJoinDate(\''+n+'\')" style="background:var(--g);color:#000;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">저장</button>' +
+          '</div>';
+        }).join('');
+    }
+  }
+}
+
 function addMember() {
   var name = (el('a-new-member')||{}).value.trim();
   if (!name) return;
@@ -2064,6 +2169,7 @@ function addMember() {
   if (S.members.indexOf(name)===-1) {
     S.members.push(name);
     S.members.sort(function(a, b){ return a.localeCompare(b, 'ko'); });
+    addHistory('join', name);
     saveState(); renderAdmin(); renderDues();
   }
   el('a-new-member').value = '';
@@ -2224,6 +2330,8 @@ function setMemberRole(name, role) {
 
 function removeMember(name) {
   S.members = (S.members||[]).filter(function(n){ return n!==name; });
+  if (S.memberJoinDate) delete S.memberJoinDate[name];
+  addHistory('leave', name);
   saveState(); renderAdmin(); renderDues();
 }
 
@@ -2774,6 +2882,7 @@ function deleteDeviceName(btn) {
   var name = S.deviceNames[did];
   delete S.deviceNames[did];
   if (did === window._deviceId) { me=''; localStorage.removeItem('hd_me'); updateNameLbl(); }
+  addHistory('reset', name);
   saveState(); renderAdmin();
   showToast('🔓 '+name+' 초기화됐습니다');
 }
