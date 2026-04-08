@@ -2361,20 +2361,42 @@ function removeMember(name) {
 }
 
 function copyMonthlyNames() {
-  var annual = S.annualMembers || [];
-  var leave  = S.memberLeave || {};
-  var names  = (S.members||[]).filter(function(n){
+  var annual  = S.annualMembers || [];
+  var leave   = S.memberLeave || {};
+  var names   = (S.members||[]).filter(function(n){
     return annual.indexOf(n) === -1 && !leave[n];
   });
   if (!names.length) { showToast('월회비 회원이 없습니다'); return; }
-  var text = names.join(' ');
+
+  var bi  = S.bankInfo || {};
+  var amt = S.duesAmount || 30000;
+
+  // 현재 조회 월 → "26년 5월" 형식
+  var parts = duesAdminMonth.split('-');
+  var yy  = String(parseInt(parts[0]) % 100).padStart(2,'0');
+  var mm  = parseInt(parts[1]);
+  var monthLabel = yy+'년 '+mm+'월';
+
+  var text =
+    '⚽'+monthLabel+' 회비 👏\n' +
+    '\n' +
+    '계좌: '+(bi.bank||'') +' '+(bi.num||'')+'\n' +
+    '회비: '+amt.toLocaleString()+'원\n' +
+    '예금주: '+(bi.holder||'')+'\n' +
+    '\n' +
+    '⚽입금하고 이름 지워주세요⚽\n' +
+    '\n' +
+    names.join('  ')+'\n' +
+    '\n' +
+    '⚽입금하고 이름 지워주세요⚽';
+
   navigator.clipboard.writeText(text).then(function(){
-    showToast('📋 월회비 회원 '+names.length+'명 복사됐습니다!');
+    showToast('📋 월회비 안내문 복사됐습니다!');
   }).catch(function(){
     var e2 = document.createElement('textarea');
     e2.value = text; document.body.appendChild(e2); e2.select();
     document.execCommand('copy'); document.body.removeChild(e2);
-    showToast('📋 월회비 회원 '+names.length+'명 복사됐습니다!');
+    showToast('📋 월회비 안내문 복사됐습니다!');
   });
 }
 
