@@ -1892,18 +1892,19 @@ function renderAdminDues() {
   var paid   = (S.duesPaid && S.duesPaid[duesAdminMonth]) ? S.duesPaid[duesAdminMonth] : [];
   var annual = S.annualMembers || [];
   var leave  = S.memberLeave || {};
-  // 월회비 = 연회비 아니고 + 휴회중 아닌 회원
   var monthly = (S.members||[]).filter(function(n){
     return annual.indexOf(n) === -1 && !leave[n];
   });
-  // 휴회중인 회원
   var onLeave = (S.members||[]).filter(function(n){ return !!leave[n]; });
 
   var html = '';
 
   // 월회비 회원
   if (monthly.length) {
-    html += '<div style="font-size:11px;color:var(--mut);font-weight:700;margin-bottom:6px">💰 월회비 회원 <span style="font-weight:400">(탭 → 납부/연회비 선택)</span></div>';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">' +
+      '<div style="font-size:11px;color:var(--mut);font-weight:700">💰 월회비 회원 <span style="font-weight:400">(탭 → 납부/연회비 선택)</span></div>' +
+      '<button onclick="copyMonthlyNames()" style="background:var(--c1);border:1px solid var(--brd);color:var(--txt);border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer">📋 이름 복사</button>' +
+    '</div>';
     html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">' +
       monthly.map(function(n){
         var isPaid = paid.indexOf(n) !== -1;
@@ -1916,7 +1917,10 @@ function renderAdminDues() {
 
   // 연회비 회원
   if (annual.length) {
-    html += '<div style="font-size:11px;color:var(--yel);font-weight:700;margin-bottom:6px">🏅 연회비 회원</div>';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">' +
+      '<div style="font-size:11px;color:var(--yel);font-weight:700">🏅 연회비 회원</div>' +
+      '<button onclick="copyAnnualNames()" style="background:var(--c1);border:1px solid rgba(255,214,0,.3);color:var(--yel);border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer">📋 이름 복사</button>' +
+    '</div>';
     html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">' +
       annual.map(function(n){
         return '<div style="padding:6px 12px;border-radius:20px;font-size:13px;' +
@@ -1924,7 +1928,7 @@ function renderAdminDues() {
       }).join('') + '</div>';
   }
 
-  // 휴회중 회원 (납부 대상 아님)
+  // 휴회중
   if (onLeave.length) {
     html += '<div style="font-size:11px;color:#666;font-weight:700;margin-bottom:6px">⏸️ 휴회중 (납부 제외)</div>';
     html += '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
@@ -2367,6 +2371,38 @@ function removeMember(name) {
   saveState(); renderAdmin(); renderDues();
 }
 
+function copyMonthlyNames() {
+  var annual = S.annualMembers || [];
+  var leave  = S.memberLeave || {};
+  var names  = (S.members||[]).filter(function(n){
+    return annual.indexOf(n) === -1 && !leave[n];
+  });
+  if (!names.length) { showToast('월회비 회원이 없습니다'); return; }
+  var text = names.join(' ');
+  navigator.clipboard.writeText(text).then(function(){
+    showToast('📋 월회비 회원 '+names.length+'명 복사됐습니다!');
+  }).catch(function(){
+    var e2 = document.createElement('textarea');
+    e2.value = text; document.body.appendChild(e2); e2.select();
+    document.execCommand('copy'); document.body.removeChild(e2);
+    showToast('📋 월회비 회원 '+names.length+'명 복사됐습니다!');
+  });
+}
+
+function copyAnnualNames() {
+  var names = S.annualMembers || [];
+  if (!names.length) { showToast('연회비 회원이 없습니다'); return; }
+  var text = names.join(' ');
+  navigator.clipboard.writeText(text).then(function(){
+    showToast('📋 연회비 회원 '+names.length+'명 복사됐습니다!');
+  }).catch(function(){
+    var e2 = document.createElement('textarea');
+    e2.value = text; document.body.appendChild(e2); e2.select();
+    document.execCommand('copy'); document.body.removeChild(e2);
+    showToast('📋 연회비 회원 '+names.length+'명 복사됐습니다!');
+  });
+}
+
 // ── 납부 선택 모달 ──
 var _duesTargetName = '';
 
@@ -2404,7 +2440,7 @@ function duesAction(action) {
       showToast('🏅 ' + name + ' 연회비 회원으로 전환됐습니다');
     }
   }
-  saveState(); renderAdminDues(); renderDues();
+  saveState(); renderAdminDues(); renderDues(); renderAnnualMembers();
   closeModal('mo-dues');
 }
 
