@@ -263,6 +263,8 @@ textarea{resize:vertical;min-height:80px}
       <div style="color:var(--mut);font-size:13px;text-align:center;padding:10px 0">관리자가 계좌 정보를 등록하면 표시됩니다</div>
     </div>
   </div>
+  <!-- 연회비 회원 -->
+  <div class="card" id="dues-annual-info" style="display:none"></div>
 </div>
 
 <!-- RULES -->
@@ -378,7 +380,21 @@ textarea{resize:vertical;min-height:80px}
         <div style="font-size:12px;color:var(--mut);margin-bottom:4px">계좌번호</div>
         <input type="text" id="a-bank-num" placeholder="3333-00-0000000">
         <button class="btn btng btnsm" onclick="saveBankInfo()">계좌 정보 저장</button>
-        <div style="height:12px"></div>
+        <div style="height:16px"></div>
+
+        <!-- 연회비 회원 관리 -->
+        <div style="background:var(--c1);border-radius:10px;overflow:hidden;margin-bottom:12px">
+          <button onclick="toggleAnnualSection()" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:none;border:none;color:var(--txt);font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR'">
+            <span>🏅 연회비 회원 관리</span>
+            <span id="annual-arrow">▼</span>
+          </button>
+          <div id="annual-section" style="display:none;padding:0 12px 12px">
+            <div style="font-size:12px;color:var(--mut);margin-bottom:8px">탭하면 연회비 ↔ 월회비 전환</div>
+            <div id="a-annual-members"></div>
+          </div>
+        </div>
+
+        <!-- 월별 납부 현황 -->
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <div style="display:flex;align-items:center;gap:6px">
             <button onclick="changeDuesMonthAdmin(-1)" class="month-btn">◀</button>
@@ -629,6 +645,7 @@ var DEF = {
   deviceNames: {},
   memberRoles: {},
   memberLeave: {},
+  annualMembers: [],
   notice: { active: false, title: '', body: '' },
   location: { name:'', lat:0, lng:0 },
   settings: { adminPw: '1234' }
@@ -716,7 +733,7 @@ function syncSupabase() {
 }
 
 function ensureKeys() {
-  var keys = ['members','votes','comments','matches','momVoters','duesPaid','extraVotes','rules','deviceNames','location','bankInfo','memberRoles','memberLeave'];
+  var keys = ['members','votes','comments','matches','momVoters','duesPaid','extraVotes','rules','deviceNames','location','bankInfo','memberRoles','memberLeave','annualMembers'];
   for (var i = 0; i < keys.length; i++) {
     if (!S[keys[i]]) S[keys[i]] = cloneObj(DEF[keys[i]]);
   }
@@ -1731,6 +1748,22 @@ function renderDues() {
       acEl.innerHTML = '<div style="color:var(--mut);font-size:13px;text-align:center;padding:10px 0">관리자가 계좌 정보를 등록하면 표시됩니다</div>';
     }
   }
+  // 연회비 회원 표시
+  var annual = S.annualMembers || [];
+  var annualEl = el('dues-annual-info');
+  if (annualEl) {
+    if (annual.length) {
+      annualEl.style.display = 'block';
+      annualEl.innerHTML =
+        '<div style="font-size:12px;color:var(--yel);font-weight:700;margin-bottom:6px">🏅 연회비 회원</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
+        annual.map(function(n){
+          return '<div style="padding:5px 12px;border-radius:20px;font-size:13px;border:1px solid rgba(255,214,0,.4);background:rgba(255,214,0,.08);color:var(--yel)">'+n+'</div>';
+        }).join('') + '</div>';
+    } else {
+      annualEl.style.display = 'none';
+    }
+  }
 }
 
 function copyBankAll() {
@@ -1786,17 +1819,74 @@ function changeDuesMonthAdmin(n) {
   renderAdminDues();
 }
 
-function renderAdminDues() {
-  var paid = (S.duesPaid && S.duesPaid[duesAdminMonth]) ? S.duesPaid[duesAdminMonth] : [];
-  setHTML('a-dues',
+// ── 연회비 섹션 ──
+function toggleAnnualSection() {
+  var sec   = el('annual-section');
+  var arrow = el('annual-arrow');
+  if (!sec) return;
+  var isOpen = sec.style.display !== 'none';
+  sec.style.display = isOpen ? 'none' : 'block';
+  if (arrow) arrow.textContent = isOpen ? '▼' : '▲';
+  if (!isOpen) renderAnnualMembers();
+}
+
+function renderAnnualMembers() {
+  var annual = S.annualMembers || [];
+  setHTML('a-annual-members',
     '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
     (S.members||[]).map(function(n){
-      var isPaid = paid.indexOf(n) !== -1;
-      return '<div onclick="togDues(\''+n+'\')" style="padding:6px 12px;border-radius:20px;font-size:13px;cursor:pointer;' +
-        'border:1px solid '+(isPaid?'rgba(0,200,83,.4)':'rgba(255,23,68,.35)')+';' +
-        'background:'+(isPaid?'rgba(0,200,83,.1)':'rgba(255,23,68,.06)')+';' +
-        'color:'+(isPaid?'#00C853':'var(--red)')+'">'+n+'</div>';
-    }).join('') + '</div>');
+      var isAnnual = annual.indexOf(n) !== -1;
+      return '<div onclick="togAnnual(\''+n+'\')" style="padding:6px 12px;border-radius:20px;font-size:13px;cursor:pointer;transition:.15s;' +
+        'border:1px solid '+(isAnnual?'rgba(255,214,0,.5)':'var(--brd)')+';' +
+        'background:'+(isAnnual?'rgba(255,214,0,.1)':'transparent')+';' +
+        'color:'+(isAnnual?'var(--yel)':'var(--mut)')+'>' +
+        (isAnnual?'🏅 ':'') + n + (isAnnual?' (연)':'') +
+      '</div>';
+    }).join('') + '</div>'
+  );
+}
+
+function togAnnual(name) {
+  if (!S.annualMembers) S.annualMembers = [];
+  var idx = S.annualMembers.indexOf(name);
+  if (idx === -1) S.annualMembers.push(name);
+  else S.annualMembers.splice(idx, 1);
+  saveState(); renderAnnualMembers(); renderAdminDues();
+  var isAnnual = S.annualMembers.indexOf(name) !== -1;
+  showToast(name + ' → ' + (isAnnual ? '🏅 연회비' : '💰 월회비'));
+}
+
+function renderAdminDues() {
+  var paid   = (S.duesPaid && S.duesPaid[duesAdminMonth]) ? S.duesPaid[duesAdminMonth] : [];
+  var annual = S.annualMembers || [];
+  var monthly = (S.members||[]).filter(function(n){ return annual.indexOf(n) === -1; });
+
+  var html = '';
+
+  // 월회비 회원
+  if (monthly.length) {
+    html += '<div style="font-size:11px;color:var(--mut);font-weight:700;margin-bottom:6px">💰 월회비 회원</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">' +
+      monthly.map(function(n){
+        var isPaid = paid.indexOf(n) !== -1;
+        return '<div onclick="togDues(\''+n+'\')" style="padding:6px 12px;border-radius:20px;font-size:13px;cursor:pointer;' +
+          'border:1px solid '+(isPaid?'rgba(0,200,83,.4)':'rgba(255,23,68,.35)')+';' +
+          'background:'+(isPaid?'rgba(0,200,83,.1)':'rgba(255,23,68,.06)')+';' +
+          'color:'+(isPaid?'#00C853':'var(--red)')+'">'+n+(isPaid?' ✓':'')+'</div>';
+      }).join('') + '</div>';
+  }
+
+  // 연회비 회원 (월별 납부 체크 불필요하지만 표시는 함)
+  if (annual.length) {
+    html += '<div style="font-size:11px;color:var(--yel);font-weight:700;margin-bottom:6px">🏅 연회비 회원</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
+      annual.map(function(n){
+        return '<div style="padding:6px 12px;border-radius:20px;font-size:13px;' +
+          'border:1px solid rgba(255,214,0,.4);background:rgba(255,214,0,.08);color:var(--yel)">'+n+' 🏅</div>';
+      }).join('') + '</div>';
+  }
+
+  setHTML('a-dues', html || '<div style="color:var(--mut);font-size:13px;text-align:center;padding:8px 0">팀원을 먼저 등록하세요</div>');
 }
 
 // ── RULES ──
