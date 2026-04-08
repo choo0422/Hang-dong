@@ -2077,9 +2077,9 @@ function renderHistory() {
     list.innerHTML = '<div style="color:var(--mut);font-size:13px;text-align:center;padding:12px 0">기록 없음</div>';
     return;
   }
-  var ICON = { join:'✅', leave:'🚪', reset:'🔓' };
-  var COLOR = { join:'#00C853', leave:'var(--red)', reset:'var(--yel)' };
-  var LABEL = { join:'가입', leave:'탈퇴', reset:'기기초기화' };
+  var ICON  = { join:'✅', leave:'🚪', reset:'🔓', start:'📱' };
+  var COLOR = { join:'#00C853', leave:'var(--red)', reset:'var(--yel)', start:'var(--blu)' };
+  var LABEL = { join:'가입', leave:'탈퇴', reset:'기기초기화', start:'앱 이용 시작' };
   list.innerHTML = history.map(function(h){
     return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--brd)">' +
       '<span style="font-size:16px">'+ICON[h.type]+'</span>' +
@@ -3030,9 +3030,12 @@ function saveName() {
   Object.keys(S.deviceNames).forEach(function(k){ if(S.deviceNames[k]===name&&k!==did) existingDevice=k; });
   if (existingDevice) { showToast('⚠️ 이미 다른 기기에서 사용 중인 이름이에요!'); return; }
   if (S.deviceNames[did] && S.deviceNames[did]!==name && !admIn) { showToast('⚠️ 이름은 관리자만 변경할 수 있어요'); return; }
+  // 처음 이용 시작하는 경우 히스토리 기록
+  var isNewReg = !S.deviceNames[did];
   S.deviceNames[did] = name;
   me = name;
   localStorage.setItem('hd_me', me);
+  if (isNewReg) addHistory('start', name);
   saveState(); updateNameLbl(); closeModal('mo-name');
   renderVote(); renderStats();
   showToast(isFirst ? '👋 '+me+'님 환영합니다!' : '✅ '+me+'(으)로 변경됐습니다');
