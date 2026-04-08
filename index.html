@@ -743,8 +743,11 @@ function saveState() {
   }).catch(function(){});
 }
 
-function syncSupabase() {
-  if (SUPABASE_URL === 'YOUR_SUPABASE_URL') return;
+function syncSupabase(callback) {
+  if (SUPABASE_URL === 'YOUR_SUPABASE_URL') {
+    if (callback) callback();
+    return;
+  }
   fetch(SUPABASE_URL + '/rest/v1/gamedata?key=eq.' + DB_KEY + '&select=value', {
     method: 'GET', headers: sbHeaders()
   }).then(function(r){ return r.json(); }).then(function(rows){
@@ -762,7 +765,11 @@ function syncSupabase() {
         renderAll();
       } catch(e) {}
     }
-  }).catch(function(e){ console.warn('Supabase sync failed:', e.message); });
+    if (callback) callback();
+  }).catch(function(e){
+    console.warn('Supabase sync failed:', e.message);
+    if (callback) callback();
+  });
 }
 
 function ensureKeys() {
@@ -807,9 +814,11 @@ function init() {
   tickDeadline();
   setInterval(tickDeadline, 30000);
   setInterval(checkMomExpiry, 60000);
-  if (!me) setTimeout(function(){ openNameModal(true); }, 400);
 
-  syncSupabase();
+  // Supabase 동기화 먼저 → 완료 후 이름 모달 열기
+  syncSupabase(function() {
+    if (!me) setTimeout(function(){ openNameModal(true); }, 200);
+  });
   setInterval(syncSupabase, 30000);
   setTimeout(refreshWeather, 1000);
   setInterval(refreshWeather, 1800000);
@@ -3030,11 +3039,15 @@ function openNameModal(first) {
   var alreadyReg = S.deviceNames && S.deviceNames[did];
   if (alreadyReg && !admIn && !first) { showToast('이름은 관리자만 변경할 수 있어요 🔒'); return; }
   var taken = S.deviceNames ? Object.values(S.deviceNames) : [];
+  var members = (S.members||[]).filter(function(n){ return taken.indexOf(n)===-1||n===me; });
   var sel = el('mo-sel');
   if (sel) {
-    sel.innerHTML = '<option value="">-- 팀원 선택 --</option>' +
-      (S.members||[]).filter(function(n){ return taken.indexOf(n)===-1||n===me; })
-      .map(function(n){ return '<option value="'+n+'"'+(n===me?' selected':'')+'>'+n+'</option>'; }).join('');
+    if (members.length === 0) {
+      sel.innerHTML = '<option value="">팀원 목록이 없습니다 (관리자 문의)</option>';
+    } else {
+      sel.innerHTML = '<option value="">-- 내 이름 선택 --</option>' +
+        members.map(function(n){ return '<option value="'+n+'"'+(n===me?' selected':'')+'>'+n+'</option>'; }).join('');
+    }
   }
   var inp = el('mo-inp'); if (inp) inp.value = me;
   var mf = el('mo-first'); if (mf) mf.style.display = first?'block':'none';
