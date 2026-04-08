@@ -1957,10 +1957,12 @@ function renderRules() {
 }
 
 // ── ADMIN ──
+var SUPER_ADMIN = '추우람';
+
 function admLogin() {
   var pw = (el('adm-pw')||{}).value || '';
   var correct = S.settings && S.settings.adminPw ? S.settings.adminPw : '1234';
-  if (pw === correct) {
+  if (me === SUPER_ADMIN || pw === correct) {
     admIn = true;
     el('admin-lock').style.display = 'none';
     el('admin-panel').style.display = 'block';
@@ -3094,7 +3096,17 @@ function go(name) {
   var pages = ['home','vote','stats','dues','rules','admin'];
   var idx = pages.indexOf(name);
   if (idx!==-1 && nbs[idx]) nbs[idx].classList.add('on');
-  if (name==='admin' && !admIn) { el('admin-panel').style.display='none'; el('admin-lock').style.display='block'; }
+  if (name==='admin') {
+    if (me === SUPER_ADMIN && !admIn) {
+      admIn = true;
+      el('admin-lock').style.display = 'none';
+      el('admin-panel').style.display = 'block';
+      renderAdmin();
+    } else if (!admIn) {
+      el('admin-panel').style.display = 'none';
+      el('admin-lock').style.display = 'block';
+    }
+  }
   if (name==='stats') renderMomSection();
   if (name==='dues') renderDues();
 }
