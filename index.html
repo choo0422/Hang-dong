@@ -389,8 +389,9 @@ textarea{resize:vertical;min-height:80px}
             <span id="annual-arrow">▼</span>
           </button>
           <div id="annual-section" style="display:none;padding:0 12px 12px">
-            <div style="font-size:12px;color:var(--mut);margin-bottom:8px">탭하면 연회비 ↔ 월회비 전환</div>
+            <div style="font-size:12px;color:var(--mut);margin-bottom:8px">탭하면 월회비로 전환 · 연회비 회원은 아래 납부 현황에 표시 안 됨</div>
             <div id="a-annual-members"></div>
+            <button onclick="copyAnnualNames()" style="width:100%;margin-top:10px;padding:8px;border-radius:8px;border:1px solid rgba(255,214,0,.3);background:rgba(255,214,0,.06);color:var(--yel);font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR'">📋 연회비 회원 이름 복사</button>
           </div>
         </div>
 
@@ -1864,15 +1865,16 @@ function toggleAnnualSection() {
 
 function renderAnnualMembers() {
   var annual = S.annualMembers || [];
+  if (!annual.length) {
+    setHTML('a-annual-members', '<div style="color:var(--mut);font-size:13px;text-align:center;padding:8px 0">연회비 회원이 없습니다<br><span style="font-size:11px">납부 현황에서 이름 탭 → 연회비 전환</span></div>');
+    return;
+  }
   setHTML('a-annual-members',
     '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
-    (S.members||[]).map(function(n){
-      var isAnnual = annual.indexOf(n) !== -1;
+    annual.map(function(n){
       return '<div onclick="togAnnual(\''+n+'\')" style="padding:6px 12px;border-radius:20px;font-size:13px;cursor:pointer;transition:.15s;' +
-        'border:1px solid '+(isAnnual?'rgba(255,214,0,.5)':'var(--brd)')+';' +
-        'background:'+(isAnnual?'rgba(255,214,0,.1)':'transparent')+';' +
-        'color:'+(isAnnual?'var(--yel)':'var(--mut)')+'>' +
-        (isAnnual?'🏅 ':'') + n + (isAnnual?' (연)':'') +
+        'border:1px solid rgba(255,214,0,.5);background:rgba(255,214,0,.1);color:var(--yel)">' +
+        '🏅 '+n+' <span style="font-size:10px;opacity:.7">(탭→월회비)</span>' +
       '</div>';
     }).join('') + '</div>'
   );
@@ -1889,9 +1891,9 @@ function togAnnual(name) {
 }
 
 function renderAdminDues() {
-  var paid   = (S.duesPaid && S.duesPaid[duesAdminMonth]) ? S.duesPaid[duesAdminMonth] : [];
-  var annual = S.annualMembers || [];
-  var leave  = S.memberLeave || {};
+  var paid    = (S.duesPaid && S.duesPaid[duesAdminMonth]) ? S.duesPaid[duesAdminMonth] : [];
+  var annual  = S.annualMembers || [];
+  var leave   = S.memberLeave || {};
   var monthly = (S.members||[]).filter(function(n){
     return annual.indexOf(n) === -1 && !leave[n];
   });
@@ -1899,7 +1901,7 @@ function renderAdminDues() {
 
   var html = '';
 
-  // 월회비 회원
+  // 월회비 회원만 표시
   if (monthly.length) {
     html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">' +
       '<div style="font-size:11px;color:var(--mut);font-weight:700">💰 월회비 회원 <span style="font-weight:400">(탭 → 납부/연회비 선택)</span></div>' +
@@ -1912,19 +1914,6 @@ function renderAdminDues() {
           'border:1px solid '+(isPaid?'rgba(0,200,83,.4)':'rgba(255,23,68,.35)')+';' +
           'background:'+(isPaid?'rgba(0,200,83,.1)':'rgba(255,23,68,.06)')+';' +
           'color:'+(isPaid?'#00C853':'var(--red)')+'">'+n+(isPaid?' ✓':'')+'</div>';
-      }).join('') + '</div>';
-  }
-
-  // 연회비 회원
-  if (annual.length) {
-    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">' +
-      '<div style="font-size:11px;color:var(--yel);font-weight:700">🏅 연회비 회원</div>' +
-      '<button onclick="copyAnnualNames()" style="background:var(--c1);border:1px solid rgba(255,214,0,.3);color:var(--yel);border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer">📋 이름 복사</button>' +
-    '</div>';
-    html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">' +
-      annual.map(function(n){
-        return '<div style="padding:6px 12px;border-radius:20px;font-size:13px;' +
-          'border:1px solid rgba(255,214,0,.4);background:rgba(255,214,0,.08);color:var(--yel)">'+n+' 🏅</div>';
       }).join('') + '</div>';
   }
 
