@@ -1239,7 +1239,8 @@ function renderMomBanner() {
       '<div style="display:flex;flex-wrap:wrap;margin-bottom:12px">' +
       candidates.map(function(n){
         var sel = selMomName === n;
-        return '<div class="mpl'+(sel?' sel':'')+' data-name="'+n+'" onclick="pickHomeMom(this)">⚽ '+n+'</div>';
+        var safeName = n.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        return '<div class="mpl'+(sel?' sel':'')+'" onclick="pickHomeMomByName(\''+safeName+'\',this)">⚽ '+n+'</div>';
       }).join('') + '</div>' +
       '<button onclick="submitMomVote()" style="width:100%;padding:10px;background:var(--yel);color:#000;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:'+(totalV?'10px':'0')+'">⭐ 투표하기</button>' +
       voteBar;
@@ -1685,6 +1686,13 @@ function renderPastMom() {
       '<div style="margin-top:6px;font-size:11px;color:var(--mut)">참석: '+(m.attendees||[]).join(', ')+'</div>' +
     '</div>';
   }).join('');
+}
+
+function pickHomeMomByName(name, elem) {
+  selMomName = name;
+  var items = elem.parentNode.querySelectorAll('.mpl');
+  for (var i=0;i<items.length;i++) items[i].classList.remove('sel');
+  elem.classList.add('sel');
 }
 
 function pickHomeMom(elem) {
